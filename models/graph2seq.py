@@ -65,6 +65,7 @@ class graph2seq(nn.Module):
             contexts.append(context)
             states.append(state)
         contexts = pad_sequence(contexts, batch_first=True)
+        attn = None
         if self.use_bert:
             contexts, attn = self.bert_encoder.encode(contexts, concept_mask)
         state = torch.stack(states, 0)

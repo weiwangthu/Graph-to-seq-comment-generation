@@ -30,7 +30,7 @@ def parse_args():
                         help="config file")
     parser.add_argument('-model', default='graph2seq', type=str,
                         choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention'])
-    parser.add_argument('-gpus', default=[1], type=int,
+    parser.add_argument('-gpus', default=[1], type=int, nargs='+',
                         help="Use CUDA on the listed devices.")
     parser.add_argument('-restore',
                         type=str, default=None,
