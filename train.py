@@ -214,9 +214,9 @@ def main():
         print('loading checkpoint...\n')
         checkpoints = torch.load(os.path.join(log_path, args.restore))
 
-    contentfile = os.path.join(config.data, "segged_content.txt")
+    # contentfile = os.path.join(config.data, "segged_content.txt")
     # word2id, id2word, word2count = load_vocab(args.vocab_file, args.vocab_size)
-    vocab = Vocab(config.vocab, contentfile, config.vocab_size)
+    vocab = Vocab(config.vocab, config.data, config.vocab_size)
 
     # Load data
     start_time = time.time()

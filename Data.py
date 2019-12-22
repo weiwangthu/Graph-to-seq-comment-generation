@@ -33,9 +33,12 @@ class Vocab:
 
     @staticmethod
     def build_vocab(corpus_file, vocab_file):
+        corpus_file = os.path.join(corpus_file, 'train_graph_features.json')
         word2count = {}
         for line in open(corpus_file):
-            words = line.strip().split()
+            # words = line.strip().split()
+            g = json.loads(line)
+            words = g["text"].split()
             for word in words:
                 if word not in word2count:
                     word2count[word] = 0

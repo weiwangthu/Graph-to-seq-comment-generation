@@ -1,10 +1,10 @@
 #data_path: "./data/graph_features_text_no_cd.json"
-data: "./sport_data/"
-vocab: './sport_data/vocab.txt'
+data: "./Data/sport/"
+vocab: './Data/sport/vocab.txt'
 vocab_size: 60000
 type_num: 4
 head_num: 4
-log: './sport_data/log/'
+log: './Data/sport/log/'
 epoch: 5
 batch_size: 32
 param_init: 0.1
