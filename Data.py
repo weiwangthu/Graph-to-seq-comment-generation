@@ -169,6 +169,7 @@ class Batch:
             self.concept = [np.array(e.concept, dtype=np.long) for e in example_list]
             self.title_index = [e.title_index for e in example_list]
             self.adj = [e.adj for e in example_list]
+
         elif model == 'seq2seq':
             self.title_content_len = self.get_length([e.title + e.original_content for e in example_list], max_len)
             self.title_content, self.title_content_mask = self.padding(
@@ -176,9 +177,24 @@ class Batch:
                 max(self.title_content_len))
             self.title_len = self.get_length([e.title for e in example_list], max_len)
             self.title, self.title_mask = self.padding([e.title for e in example_list], max(self.title_len))
+
+        elif model == 'select2seq':
+            content_list = [e.original_content for e in example_list]
+            self.content_len = self.get_length(content_list, max_len)
+            self.content, self.content_mask = self.padding(content_list, max(self.content_len))
+
+            title_list = [e.title for e in example_list]
+            self.title_len = self.get_length(title_list, max_len)
+            self.title, self.title_mask = self.padding(title_list, max(self.title_len))
+
+            title_content_list = [e.title + e.original_content for e in example_list]
+            self.title_content_len = self.get_length(title_content_list, max_len)
+            self.title_content, self.title_content_mask = self.padding(title_content_list, max(self.title_content_len))
+
         elif model == 'bow2seq':
             self.bow_len = self.get_length([e.bow for e in example_list], max_len)
             self.bow, self.bow_mask = self.padding([e.bow for e in example_list], max(self.bow_len))
+
         if is_train:
             self.tgt_len = self.get_length([e.target for e in example_list], max_len)
             max_tgt_len = max(self.tgt_len)

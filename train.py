@@ -117,7 +117,10 @@ def train(model, vocab, dataloader, scheduler, optim, updates):
             target = batch.tgt
             if use_cuda:
                 target = target.cuda()
-            loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
+            if isinstance(outputs, dict):
+                loss, acc = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+            else:
+                loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
             loss.backward()
             total_loss += loss.data.item()
             # report_correct += num_correct

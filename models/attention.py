@@ -32,14 +32,43 @@ class global_attention(nn.Module):
         self.tanh = nn.Tanh()
         self.activation = activation
 
-    def forward(self, x, context, mask=None):
+    def forward(self, x, context, mask=None, context_gates=None):
         gamma_h = self.linear_in(x).unsqueeze(2)  # batch * size * 1
         if self.activation == 'tanh':
             gamma_h = self.tanh(gamma_h)
         weights = torch.bmm(context, gamma_h).squeeze(2)  # batch * time
+
+        if context_gates is not None:
+            weights = weights * context_gates
+
         weights = self.softmax(weights)  # batch * time
         c_t = torch.bmm(weights.unsqueeze(1), context).squeeze(1)  # batch * size
         output = self.tanh(self.linear_out(torch.cat([c_t, x], 1)))
+        return output, weights
+
+
+class global_attention_with_topic(nn.Module):
+
+    def __init__(self, hidden_size, activation=None):
+        super(global_attention_with_topic, self).__init__()
+        self.linear_in = nn.Linear(hidden_size, hidden_size)
+        self.linear_out = nn.Linear(3 * hidden_size, hidden_size)
+        self.softmax = nn.Softmax(-1)
+        self.tanh = nn.Tanh()
+        self.activation = activation
+
+    def forward(self, x, context, mask=None, context_gates=None, topic=None):
+        gamma_h = self.linear_in(x).unsqueeze(2)  # batch * size * 1
+        if self.activation == 'tanh':
+            gamma_h = self.tanh(gamma_h)
+        weights = torch.bmm(context, gamma_h).squeeze(2)  # batch * time
+
+        if context_gates is not None:
+            weights = weights * context_gates
+
+        weights = self.softmax(weights)  # batch * time
+        c_t = torch.bmm(weights.unsqueeze(1), context).squeeze(1)  # batch * size
+        output = self.tanh(self.linear_out(torch.cat([c_t, x, topic], 1)))
         return output, weights
 
 
