@@ -1,7 +1,3 @@
-import os
-import json
-import sys
-import numpy as np
 import torch
 import random
 import copy
@@ -16,39 +12,22 @@ EOS = 2
 UNK = 3
 MASK = 4
 TITLE = 5
-MAX_LENGTH = 100
+BUFSIZE = 4096000
+
+MAX_ARTICLE_LENGTH = 600
+MAX_TITLE_LENGTH = 30
+MAX_COMMENT_LENGTH = 50
 
 
 class Vocab:
-    def __init__(self, vocab_file, content_file, vocab_size=50000):
+    def __init__(self, vocab_file, vocab_size=50000):
         self._word2id = {'[PADDING]': 0, '[START]': 1, '[END]': 2, '[OOV]': 3, '[MASK]': 4, '_TITLE_': 5}
         self._id2word = ['[PADDING]', '[START]', '[END]', '[OOV]', '[MASK]', '_TITLE_']
         self._wordcount = {'[PADDING]': 1, '[START]': 1, '[END]': 1, '[OOV]': 1, '[MASK]': 1, '_TITLE_': 1}
-        if not os.path.exists(vocab_file):
-            self.build_vocab(content_file, vocab_file)
         self.load_vocab(vocab_file, vocab_size)
         self.voc_size = len(self._word2id)
         self.UNK_token = 3
         self.PAD_token = 0
-
-    @staticmethod
-    def build_vocab(corpus_file, vocab_file):
-        corpus_file = os.path.join(corpus_file, 'train_graph_features.json')
-        word2count = {}
-        for line in open(corpus_file):
-            # words = line.strip().split()
-            g = json.loads(line)
-            words = g["text"].split()
-            for word in words:
-                if word not in word2count:
-                    word2count[word] = 0
-                word2count[word] += 1
-        word2count = list(word2count.items())
-        word2count.sort(key=lambda k: k[1], reverse=True)
-        write = open(vocab_file, 'w')
-        for word_pair in word2count:
-            write.write(word_pair[0] + '\t' + str(word_pair[1]) + '\n')
-        write.close()
 
     def load_vocab(self, vocab_file, vocab_size):
         for line in open(vocab_file):
@@ -100,36 +79,27 @@ class Example:
         memory: tag (oov has extend ids)
     """
 
-    def __init__(self, content, original_content, title, title_index, target, adj, concept, vocab, is_train):
-        self.ori_title = title
-        self.ori_original_content = original_content
-        self.ori_content = content
+    def __init__(self, original_content, title, target, vocab, is_train):
+        self.ori_title = title[:MAX_TITLE_LENGTH]
+        self.ori_original_content = original_content[:MAX_ARTICLE_LENGTH]
         if is_train:
-            self.ori_target = target
+            self.ori_target = target[:MAX_COMMENT_LENGTH]
         else:
-            self.ori_targets = target
-        self.ori_concept = concept
-        self.adj = adj
-        self.concept = [vocab.word2id(c) for c in concept]
+            self.ori_targets = [tar[:MAX_COMMENT_LENGTH] for tar in target]
+
         self.title = vocab.sent2id(title)
-        self.title_index = title_index
+        self.original_content = vocab.sent2id(self.ori_original_content)
         if is_train:
             self.target = vocab.sent2id(target, add_start=True, add_end=True)
-        self.original_content = vocab.sent2id(self.ori_original_content)
-        self.sentence_content = split_chinese_sentence(self.ori_original_content)
-        self.sentence_content = [vocab.sent2id(sentence) for sentence in
-                                 self.sentence_content]
-        self.sentence_content_max_len = min(max([len(c) for c in self.sentence_content]), MAX_LENGTH)
-        self.sentence_content, self.sentence_content_mask = Batch.padding(self.sentence_content,
-                                                                          self.sentence_content_max_len,
-                                                                          limit_length=True)
-        self.bow = self.bow(self.original_content)
-        self.content = [vocab.sent2id(content) for content in self.ori_content]
-        self.content_max_len = min(max([len(c) for c in self.content]), MAX_LENGTH)
-        self.content, self.content_mask = Batch.padding(self.content, self.content_max_len, limit_length=True)
-        assert len(self.content) == self.adj.size(0)
 
-    def bow(self, content, maxlen=MAX_LENGTH):
+        self.sentence_content = split_chinese_sentence(self.ori_original_content)
+        self.sentence_content = [vocab.sent2id(sen[:MAX_ARTICLE_LENGTH]) for sen in self.sentence_content]
+        self.sentence_content_max_len = Batch.get_length(self.sentence_content, MAX_ARTICLE_LENGTH)
+        self.sentence_content, self.sentence_content_mask = Batch.padding_list_to_tensor(self.sentence_content, self.sentence_content_max_len.max())
+
+        self.bow = self.bow_vec(self.original_content, MAX_ARTICLE_LENGTH)
+
+    def bow_vec(self, content, max_len):
         bow = {}
         for word_id in content:
             if word_id not in bow:
@@ -138,7 +108,7 @@ class Example:
         bow = list(bow.items())
         bow.sort(key=lambda k: k[1], reverse=True)
         bow.insert(0, (UNK, 1))
-        return [word_id[0] for word_id in bow[:maxlen]]
+        return [word_id[0] for word_id in bow[:max_len]]
 
 
 class Batch:
@@ -148,61 +118,41 @@ class Batch:
     """
 
     def __init__(self, example_list, is_train, model):
-        max_len = MAX_LENGTH
         self.model = model
         self.is_train = is_train
         self.examples = example_list
         if model == 'h_attention':
-            self.sentence_content = [np.array(e.sentence_content, dtype=np.long) for e in example_list]
-            self.sentence_content_mask = [np.array(e.sentence_content_mask, dtype=np.int32) for e in example_list]
-            self.sentence_content_len = [len(e.sentence_content) for e in example_list]
-            max_sent_num = max(self.sentence_content_len)
-            self.sentence_mask, _ = self.padding([[1 for _ in range(d)] for d in self.sentence_content_len],
-                                                 max_sent_num, limit_length=False)
-        elif model == 'graph2seq':
-            self.src_len = [len(e.content) for e in example_list]
-            batch_src = [e.content for e in example_list]
-            self.src = [np.array(src, dtype=np.long) for src in batch_src]
-            self.src_mask = [np.array(e.content_mask, dtype=np.int32) for e in example_list]
-            concept_max_len = max([len(e.concept) for e in example_list])
-            self.concept_vocab, self.concept_mask = self.padding([e.concept for e in example_list], concept_max_len)
-            self.concept = [np.array(e.concept, dtype=np.long) for e in example_list]
-            self.title_index = [e.title_index for e in example_list]
-            self.adj = [e.adj for e in example_list]
+            self.sentence_content = [e.sentence_content for e in example_list]
+            self.sentence_content_mask = [e.sentence_content_mask for e in example_list]
 
-        elif model == 'seq2seq':
-            self.title_content_len = self.get_length([e.title + e.original_content for e in example_list], max_len)
-            self.title_content, self.title_content_mask = self.padding(
-                [e.title + e.original_content for e in example_list],
-                max(self.title_content_len))
-            self.title_len = self.get_length([e.title for e in example_list], max_len)
-            self.title, self.title_mask = self.padding([e.title for e in example_list], max(self.title_len))
+            self.sentence_len = self.get_length(self.sentence_content)
+            self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_len], self.sentence_len.max())
+            self.sentence_mask = self.sentence_mask.to(torch.uint8)
 
-        elif model == 'select2seq':
+        elif model == 'select2seq' or 'seq2seq':
             content_list = [e.original_content for e in example_list]
-            self.content_len = self.get_length(content_list, max_len)
-            self.content, self.content_mask = self.padding(content_list, max(self.content_len))
+            self.content_len = self.get_length(content_list, MAX_ARTICLE_LENGTH)
+            self.content, self.content_mask = self.padding_list_to_tensor(content_list, self.content_len.max())
 
             title_list = [e.title for e in example_list]
-            self.title_len = self.get_length(title_list, max_len)
-            self.title, self.title_mask = self.padding(title_list, max(self.title_len))
+            self.title_len = self.get_length(title_list, MAX_TITLE_LENGTH)
+            self.title, self.title_mask = self.padding_list_to_tensor(title_list, self.title_len.max())
 
             title_content_list = [e.title + e.original_content for e in example_list]
-            self.title_content_len = self.get_length(title_content_list, max_len)
-            self.title_content, self.title_content_mask = self.padding(title_content_list, max(self.title_content_len))
+            self.title_content_len = self.get_length(title_content_list, MAX_TITLE_LENGTH + MAX_ARTICLE_LENGTH)
+            self.title_content, self.title_content_mask = self.padding_list_to_tensor(title_content_list, self.title_content_len.max())
 
         elif model == 'bow2seq':
-            self.bow_len = self.get_length([e.bow for e in example_list], max_len)
-            self.bow, self.bow_mask = self.padding([e.bow for e in example_list], max(self.bow_len))
+            bow_list = [e.bow for e in example_list]
+            self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
+            self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max())
 
         if is_train:
-            self.tgt_len = self.get_length([e.target for e in example_list], max_len)
-            max_tgt_len = max(self.tgt_len)
-            batch_tgt, self.tgt_mask = self.padding([e.target for e in example_list], max_tgt_len)
-            self.tgt = np.array(batch_tgt, dtype=np.long)
-        self.to_tensor()
+            self.tgt_len = self.get_length([e.target for e in example_list])
+            self.tgt, self.tgt_mask = self.padding_list_to_tensor([e.target for e in example_list], self.tgt_len.max())
 
-    def get_length(self, examples, max_len):
+    @staticmethod
+    def get_length(examples, max_len=1000):
         length = []
         for e in examples:
             if len(e) > max_len:
@@ -210,145 +160,112 @@ class Batch:
             else:
                 length.append(len(e))
         assert len(length) == len(examples)
+        length = torch.LongTensor(length)
         return length
 
-    def to_tensor(self):
-        if self.model == 'graph2seq':
-            self.src = [torch.from_numpy(src) for src in self.src]
-            self.src_mask = [torch.from_numpy(mask) for mask in self.src_mask]
-            self.src_len = torch.from_numpy(np.array(self.src_len, dtype=np.long))
-            self.title_index = torch.from_numpy(np.array(self.title_index, dtype=np.long))
-            self.concept = [torch.from_numpy(concept) for concept in self.concept]
-            self.concept_vocab = torch.from_numpy(np.array(self.concept_vocab, dtype=np.long))
-            self.concept_mask = torch.from_numpy(np.array(self.concept_mask, dtype=np.int32))
-        elif self.model == 'h_attention':
-            self.sentence_content = [torch.from_numpy(src) for src in self.sentence_content]
-            self.sentence_content_mask = [torch.from_numpy(mask) for mask in self.sentence_content_mask]
-            self.sentence_content_len = torch.from_numpy(np.array(self.sentence_content_len, dtype=np.long))
-            self.sentence_mask = torch.from_numpy(np.array(self.sentence_mask, dtype=np.int32))
-        elif self.model == 'seq2seq':
-            self.title_content = torch.from_numpy(np.array(self.title_content, dtype=np.long))
-            self.title_content_len = torch.from_numpy(np.array(self.title_content_len, dtype=np.long))
-            self.title_content_mask = torch.from_numpy(np.array(self.title_content_mask, dtype=np.long))
-            self.title = torch.from_numpy(np.array(self.title, dtype=np.long))
-            self.title_len = torch.from_numpy(np.array(self.title_len, dtype=np.long))
-            self.title_mask = torch.from_numpy(np.array(self.title_mask, dtype=np.int32))
-        elif self.model == 'bow2seq':
-            self.bow = torch.from_numpy(np.array(self.bow, dtype=np.long))
-            self.bow_len = torch.from_numpy(np.array(self.bow_len, dtype=np.long))
-            self.bow_mask = torch.from_numpy(np.array(self.bow_mask, dtype=np.int32))
-        if self.is_train:
-            self.tgt = torch.from_numpy(self.tgt)
-            self.tgt_len = torch.from_numpy(np.array(self.tgt_len, dtype=np.long))
-            self.tgt_mask = torch.from_numpy(np.array(self.tgt_mask, dtype=np.int32))
-        # adj 本来就是tensor
+    @staticmethod
+    def padding_list_to_tensor(batch, max_len):
+        padded_batch = []
+        mask_batch = []
+        for x in batch:
+            y = x + [PAD] * (max_len - len(x))
+            m = [1] * len(x) + [0] * (max_len - len(x))
+            padded_batch.append(y)
+            mask_batch.append(m)
+        padded_batch = torch.LongTensor(padded_batch)
+        mask_batch = torch.LongTensor(mask_batch).to(torch.uint8)
+        return padded_batch, mask_batch
 
     @staticmethod
-    def padding(batch, max_len, limit_length=True):
-        if limit_length:
-            max_len = min(max_len, MAX_LENGTH)
-        result = []
+    def padding_2d_list_to_tensor(batch, max_len):
+        padded_batch = []
         mask_batch = []
-        for s in batch:
-            l = copy.deepcopy(s)
-            m = [1. for _ in range(len(l))]
-            l = l[:max_len]
-            m = m[:max_len]
-            while len(l) < max_len:
-                l.append(0)
-                m.append(0.)
-            result.append(l)
+        for x in batch:
+            y = x + [PAD] * (max_len - len(x))
+            m = [1] * len(x) + [0] * (max_len - len(x))
+            padded_batch.append(y)
             mask_batch.append(m)
-        return result, mask_batch
+        padded_batch = torch.LongTensor(padded_batch)
+        mask_batch = torch.LongTensor(mask_batch).to(torch.uint8)
+        return padded_batch, mask_batch
 
 
 class DataLoader:
-    def __init__(self, config, data_path, batch_size, vocab, adj_type, use_gnn, model, no_train=False, debug=False):
-        assert MAX_LENGTH == config.max_sentence_len, (MAX_LENGTH, config.max_sentence_len)
-        self.debug = debug
-        self.vocab = vocab
+    def __init__(self, filename, batch_size, vocab, adj_type, use_gnn, model, is_train=True, debug=False):
         self.batch_size = batch_size
-        if not no_train:
-            self.train_data = self.read_json(os.path.join(data_path, 'train_graph_features.json'), adj_type,
-                                             is_train=True, use_gnn=use_gnn)
-            self.train_batches = self.make_batch(self.train_data, batch_size, is_train=True, model=model)
-            random.shuffle(self.train_batches)
-        self.dev_data = self.read_json(os.path.join(data_path, 'dev_graph_features.json'), adj_type, is_train=False,
-                                       use_gnn=use_gnn)
-        self.test_data = self.read_json(os.path.join(data_path, 'test_graph_features.json'), adj_type, is_train=False,
-                                        use_gnn=use_gnn)
-        # self.train_data, self.dev_data, self.test_data = self.split_data(self.data)
-        self.dev_batches = self.make_batch(self.dev_data, batch_size, is_train=False, model=model)
-        self.test_batches = self.make_batch(self.test_data, batch_size, is_train=False, model=model)
+        self.vocab = vocab
+        # self.max_len = MAX_LENGTH
+        self.filename = filename
+        self.stream = open(self.filename, encoding='utf8')
+        self.epoch_id = 0
 
-    @staticmethod
-    def split_data(data):
-        total_num = len(data)
-        train = data[:round(0.8 * total_num)]
-        dev = data[round(0.8 * total_num):round(0.9 * total_num)]
-        test = data[round(0.9 * total_num):]
-        return train, dev, test
+        self.is_train = is_train
+        self.debug = debug
 
-    def read_json(self, filename, adj_type, is_train=True, use_gnn=False):
-        result = []
-        for line in open(filename, "r"):
-            if len(result) > 100 and self.debug:
+        self.adj_type = adj_type
+        self.use_gnn = use_gnn
+        self.model = model
+
+    def __iter__(self):
+        lines = self.stream.readlines(BUFSIZE)
+        if not lines:
+            self.epoch_id += 1
+            self.stream.close()
+            self.stream = open(self.filename, encoding='utf8')
+            lines = self.stream.readlines(BUFSIZE)
+
+        articles = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            articles.append(json.loads(line))
+
+            if len(articles) > 100 and self.debug:
                 break
-            g = json.loads(line)
-            if is_train:
-                target = g["label"].split()
+        # random.shuffle(articles)
+
+        data = []
+        for idx, doc in enumerate(articles):
+            data.extend(self.create_comments_from_article(doc))
+        if self.is_train:
+            random.shuffle(data)
+
+        idx = 0
+        while idx < len(data):
+            example_list = self.covert_json_to_example(data[idx:idx + self.batch_size])
+            yield Batch(example_list, self.is_train, self.model)
+            idx += self.batch_size
+
+    def create_comments_from_article(self, article):
+        comments = []
+        if self.is_train:
+            for i in range(len(article['comment'])):
+                item = dict()
+                item['title'] = article['title']
+                item['body'] = article['body']
+                item['comment'] = article['comment'][i][0]
+                comments.append(item)
+        else:
+            # contain one article and multi comments
+            comments.append(article)
+        return comments
+
+    def covert_json_to_example(self, json_list):
+        results = []
+        for g in json_list:
+            if self.is_train:
+                target = g['comment'].split()
             else:
-                targets = [s.split() for s in g["label"].split("$$")]
+                # multi comments for each article
+                target = [s[0].split()for s in g['comment']]
+
             title = g["title"].split()
             original_content = g["text"].split()
 
-            # betweenness = g["g_vertices_betweenness_vec"]
-            # pagerank = g["g_vertices_pagerank_vec"]
-            # katz = g["g_vertices_katz_vec"]
-            concept_names = g["v_names"]
-            text_features = g["v_text_features_mat"]
-            content = []
-            title_index = -1
-            for i, val in enumerate(text_features):
-                if concept_names[i] == "_TITLE_":
-                    title_index = i
-                content.append(val.split())
-            assert len(concept_names) == len(content), (concept_names, content)
-
-            adj_numsent = g["adj_mat_numsent"]
-            # adj_numsent is a list(list)
-            adj_numsent = sp.coo_matrix(adj_numsent,
-                                        shape=(len(adj_numsent), len(adj_numsent)),
-                                        dtype=np.float32)
-            adj_numsent = normalize(adj_numsent, use_gnn)
-            adj_numsent = sparse_mx_to_torch_sparse_tensor(adj_numsent)
-            adj_tfidf = g["adj_mat_tfidf"]
-            adj_tfidf = sp.coo_matrix(adj_tfidf,
-                                      shape=(len(adj_tfidf), len(adj_tfidf)),
-                                      dtype=np.float32)
-            adj_tfidf = normalize(adj_tfidf, use_gnn)
-            adj_tfidf = sparse_mx_to_torch_sparse_tensor(adj_tfidf)
-            if adj_type == 'tfidf':
-                adj = adj_tfidf
-            elif adj_type == 'numsent':
-                adj = adj_numsent
-            else:
-                print('error!!!')
-            assert len(content) == adj.size(0), (len(content), adj.size())
-            if is_train:
-                e = Example(content, original_content, title, title_index, target, adj, concept_names, self.vocab,
-                            is_train)
-            else:
-                e = Example(content, original_content, title, title_index, targets, adj, concept_names, self.vocab,
-                            is_train)
-            result.append(e)
-        return result
-
-    def make_batch(self, data, batch_size, is_train, model):
-        batches = []
-        for i in range(0, len(data), batch_size):
-            batches.append(Batch(data[i:i + batch_size], is_train, model))
-        return batches
+            e = Example(original_content, title, target, self.vocab, self.is_train)
+            results.append(e)
+        return results
 
 
 def data_stats(fname, is_test):
