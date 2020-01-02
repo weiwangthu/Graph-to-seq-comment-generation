@@ -9,3 +9,4 @@ from models.memory_network import *
 from models.seq2seq import *
 from models.bow2seq import *
 from models.hierarchical_attention import hierarchical_attention
+from models.select_diverse2seq import select_diverse2seq

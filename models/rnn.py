@@ -194,7 +194,7 @@ class rnn_decoder(nn.Module):
 class rnn_topic_decoder(nn.Module):
 
     def __init__(self, config, vocab_size, embedding=None):
-        super(rnn_decoder, self).__init__()
+        super(rnn_topic_decoder, self).__init__()
         if embedding is not None:
             self.embedding = embedding
         else:

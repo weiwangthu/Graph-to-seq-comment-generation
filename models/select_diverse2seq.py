@@ -11,7 +11,8 @@ import numpy as np
 class SelectGate(nn.Module):
 
     def __init__(self, config):
-        self.linear = nn.Linear(config.encoder_hidden_size * 2, 2)
+        super(SelectGate, self).__init__()
+        self.linear = nn.Linear(config.encoder_hidden_size * 4, 2)
         self.sigmoid = nn.Softmax()
 
     def forward(self, contexts, title_context):
@@ -23,10 +24,11 @@ class SelectGate(nn.Module):
 class LatentMap(nn.Module):
 
     def __init__(self, config):
+        super(LatentMap, self).__init__()
         self.n_layers = 4
-        self.latents = []
+        self.latents = nn.ModuleList([])
         for i in range(self.n_layers):
-            self.latents.append(nn.Linear(config.encoder_hidden_size, config.encoder_hidden_size))
+            self.latents.append(nn.Linear(config.encoder_hidden_size * 2, config.encoder_hidden_size * 2))
 
     def forward(self, title_context):
         topics = []
@@ -68,16 +70,17 @@ class select_diverse2seq(nn.Module):
         gate_loss = out_dict['l1_gates']
 
         # match loss
-        match_loss = - torch.log(torch.sigmoid(out_dict['title_state'] * out_dict['comment_state'])) \
-                     + torch.log(torch.sigmoid(out_dict['title_state'] * torch.roll(out_dict['comment_state'], 1, dims=0)))
+        pos_loss = torch.log(torch.sigmoid((out_dict['title_state'] * out_dict['comment_state']).sum(dim=-1)))
+        neg_losg = torch.log(torch.sigmoid((out_dict['title_state'] * torch.roll(out_dict['comment_state'], 1, dims=0)).sum(dim=-1)))
+        match_loss = - pos_loss + neg_losg
 
-        loss = word_loss + self.config.gama1 * gate_loss.mean() + self.config.gama2 * match_loss.mean()
-        return loss
+        loss = word_loss[0] + self.config.gama1 * gate_loss.mean() + self.config.gama2 * match_loss.mean()
+        return loss, word_loss[1]
 
     def forward(self, batch, use_cuda):
         src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
         # content, content_len, content_mask = batch.content, batch.cotent_len, batch.cotent_mask
-        content, content_len, content_mask = batch.title_content, batch.title_cotent_len, batch.title_cotent_mask
+        content, content_len, content_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
         tgt, tgt_len = batch.tgt, batch.tgt_len
         if use_cuda:
             src, src_len, tgt, tgt_len, src_mask = src.cuda(), src_len.cuda(), tgt.cuda(), tgt_len.cuda(), src_mask.cuda()
@@ -85,23 +88,25 @@ class select_diverse2seq(nn.Module):
 
         # input: title, content
         title_contexts, title_state = self.title_encoder(src, src_len)
+        title_rep = title_state[0][-1]  # bsz * n_hidden
 
         # encoder
         contexts, state = self.encoder(content, content_len)
 
         # select important information of body
-        context_gates = self.select_gate(contexts, title_state[0])  # output: bsz * n_context * 2
+        context_gates = self.select_gate(contexts, title_rep)  # output: bsz * n_context * 2
         context_gates = gumbel_softmax(torch.log(context_gates), self.config.tau)
         context_gates = context_gates[:, :, 0]  # bsz * n_context
         # contexts = contexts * gates
 
         # map to multi topic
-        topics = self.map_to_latent(title_state[0])  # output: bsz * n_topic * n_hidden
+        topics = self.map_to_latent(title_rep)  # output: bsz * n_topic * n_hidden
         comment_contexts, comment_state = self.comment_encoder(tgt, tgt_len)  # output: bsz * n_hidden
-        topic_gates = self.topic_attention(comment_state[0], topics)  # output: bsz * n_topic
+        comment_rep = comment_state[0][-1]  # bsz * n_hidden
+        topic_gates = self.topic_attention(comment_rep, topics)  # output: bsz * n_topic
         topic_gates = gumbel_softmax(torch.log(topic_gates), self.config.tau)  # bsz * n_topic
 
-        select_topic = (topics * topic_gates.unsqueeze(-1)).sum(dim=1, keepdim=True)  # bsz * n_hidden
+        select_topic = (topics * topic_gates.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
         # select_topic = select_topic.expand(-1, contexts.size(1), -1)  # bsz * n_context * n_hidden
         # contexts_with_topic = torch.cat([contexts, select_topic], dim=-1)  # bsz * n_context * 2n_hidden
 
@@ -109,18 +114,18 @@ class select_diverse2seq(nn.Module):
         outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, context_gates, select_topic)
         # return outputs, gates, title_state[0], comment_state[0]
 
-        l1_gates = (context_gates * content_mask).sum(dim=-1) / content_len
+        l1_gates = (context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
         return {
             'outputs': outputs,
             'l1_gates': l1_gates,
-            'title_state': title_state[0],
-            'comment_state': comment_state[0],
+            'title_state': title_rep,
+            'comment_state': comment_rep,
         }
 
     def topic_attention(self, comment, topics):
         comment = comment.unsqueeze(2)  # bsz * n_hidden * 1
         weights = torch.bmm(topics, comment).squeeze(2)  # bsz * n_topic
-        weights = self.softmax(weights)
+        weights = F.softmax(weights)
         return weights
 
     def sample(self, batch, use_cuda):
