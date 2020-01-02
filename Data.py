@@ -130,7 +130,7 @@ class Batch:
             self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_len], self.sentence_len.max().item())
             self.sentence_mask = self.sentence_mask.to(torch.uint8)
 
-        elif model == 'select2seq' or 'seq2seq':
+        elif model == 'select_diverse2seq' or 'seq2seq':
             content_list = [e.original_content for e in example_list]
             self.content_len = self.get_length(content_list, MAX_ARTICLE_LENGTH)
             self.content, self.content_mask = self.padding_list_to_tensor(content_list, self.content_len.max().item())

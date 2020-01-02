@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument('-config', default='config.yaml', type=str,
                         help="config file")
     parser.add_argument('-model', default='graph2seq', type=str,
-                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention'])
+                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq'])
     parser.add_argument('-gpus', default=[1], type=int, nargs='+',
                         help="Use CUDA on the listed devices.")
     parser.add_argument('-restore',
@@ -264,6 +264,8 @@ def main():
         model = bow2seq(config, vocab, use_cuda)
     elif args.model == 'h_attention':
         model = hierarchical_attention(config, vocab, use_cuda)
+    elif args.model == 'select_diverse2seq':
+        model = select_diverse2seq(config, vocab, use_cuda)
 
     if args.restore:
         model.load_state_dict(checkpoints['model'])
