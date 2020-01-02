@@ -24,25 +24,15 @@ from util.nlp_utils import *
 # config
 def parse_args():
     parser = argparse.ArgumentParser(description='train.py')
-    parser.add_argument('-beam_search', default=False, action='store_true',
-                        help="beam_search")
+    parser.add_argument('-gpus', default=[1], type=int, nargs='+',
+                        help="Use CUDA on the listed devices.")
+    parser.add_argument('-seed', type=int, default=1234,
+                        help="Random seed")
+
     parser.add_argument('-config', default='config.yaml', type=str,
                         help="config file")
     parser.add_argument('-model', default='graph2seq', type=str,
                         choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq'])
-    parser.add_argument('-gpus', default=[1], type=int, nargs='+',
-                        help="Use CUDA on the listed devices.")
-    parser.add_argument('-restore',
-                        type=str, default=None,
-                        help="restore checkpoint")
-    parser.add_argument('-seed', type=int, default=1234,
-                        help="Random seed")
-    parser.add_argument('-notrain', default=False, action='store_true',
-                        help="train or not")
-    parser.add_argument('-log', default='', type=str,
-                        help="log directory")
-    parser.add_argument('-verbose', default=False, action='store_true',
-                        help="verbose")
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
     parser.add_argument('-use_copy', default=False, action="store_true",
@@ -55,6 +45,18 @@ def parse_args():
                         help='whether to use bert or memory network or nothing in the word level of encoder')
     parser.add_argument('-graph_model', default='none', choices=['GCN', 'GNN', 'none'],
                         help='whether to use gcn in the encoder')
+
+    parser.add_argument('-notrain', default=False, action='store_true',
+                        help="train or not")
+    parser.add_argument('-restore', type=str, default=None,
+                        help="restore checkpoint")
+    parser.add_argument('-beam_search', default=False, action='store_true',
+                        help="beam_search")
+
+    parser.add_argument('-log', default='', type=str,
+                        help="log directory")
+    parser.add_argument('-verbose', default=False, action='store_true',
+                        help="verbose")
     parser.add_argument('-debug', default=False, action="store_true",
                         help='whether to use debug mode')
 
@@ -96,7 +98,7 @@ use_cuda = torch.cuda.is_available()
 
 def train(model, vocab, train_data, valid_data, scheduler, optim, updates):
     scores = []
-    max_bleu = 0.
+    max_bleu = 10.
     for epoch in range(1, config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
@@ -121,51 +123,50 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, updates):
                 loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
             loss.backward()
             total_loss += loss.data.item()
-            # report_correct += num_correct
-            # report_total += num_total
-            # report_tot_vocab += total_count
-            # report_vocab += vocab_count
-            total_acc += acc
+            total_acc += acc.data.item()
 
             optim.step()
             updates += 1
             local_updates += 1
 
-            if updates % config.eval_interval == 0 or args.debug:
+            if updates % config.print_interval == 0 or args.debug:
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
                         % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
-                print('evaluating after %d updates...' % updates)
-                # TODO: fix eval and print bleu, ppl
-                score = eval_loss(model, vocab, valid_data, epoch, updates)
-                scores.append(score)
-                if score <= max_bleu:
-                    save_model(log_path + 'checkpoint_best_%d_%d_%f.pt'%(epoch, updates, score), model, optim, epoch, updates)
-                    max_bleu = score
 
-                model.train()
-                # total_loss = 0.
-                # total_acc = 0.
-                # start_time = time.time()
+            # if updates % config.eval_interval == 0 or args.debug:
+            #     print('evaluating after %d updates...' % updates)
+            #     score = eval_loss(model, vocab, valid_data, epoch, updates)
+            #     scores.append(score)
+            #     if score <= max_bleu:
+            #         save_model(log_path + 'checkpoint_best_%d_%d_%f.pt'%(epoch, updates, score), model, optim, epoch, updates)
+            #         max_bleu = score
+            #
+            #     model.train()
+            #     # total_loss = 0.
+            #     # total_acc = 0.
+            #     # start_time = time.time()
+            #
+            # if updates % config.save_interval == 0:
+            #     save_model(log_path + 'checkpoint_%d_%d.pt'%(epoch, updates), model, optim, epoch, updates)
 
-            if updates % config.save_interval == 0:
-                save_model(log_path + 'checkpoint_%d_%d.pt'%(epoch, updates), model, optim, epoch, updates)
-
-        # eval and save model after each epoch
+        # log information
         logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
                 % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+
+        # eval and save model after each epoch
         print('evaluating after %d updates...' % updates)
-        # TODO: fix eval and print bleu, ppl
         score = eval_loss(model, vocab, valid_data, epoch, updates)
         scores.append(score)
+
         if score <= max_bleu:
-            save_model(log_path + 'checkpoint_best_%d_%f.pt'%(epoch, score), model, optim, epoch, updates)
+            save_model(log_path + 'checkpoint_best_%d_%f.pt' % (epoch, score), model, optim, epoch, updates)
             max_bleu = score
 
-        save_model(log_path + 'checkpoint_%d.pt'%epoch, model, optim, epoch, updates)
+        save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates)
     return max_bleu
 
 
-def eval(model, vocab, valid_data, epoch, updates):
+def eval_bleu(model, vocab, valid_data, epoch, updates):
     model.eval()
     multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
 
@@ -211,7 +212,7 @@ def eval_loss(model, vocab, valid_data, epoch, updates):
             loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
 
         total_loss += loss.data.item()
-        total_acc += acc
+        total_acc += acc.data.item()
         local_updates += 1
 
     avg_loss, avg_acc = total_loss/local_updates, total_acc/local_updates
@@ -306,7 +307,8 @@ def main():
         logging("Best bleu score: %.2f\n" % max_bleu)
     else:
         assert args.restore is not None
-        eval(model, vocab, valid_data, 100, updates)
+        test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug)
+        eval_bleu(model, vocab, test_data, 100, updates)
 
 
 if __name__ == '__main__':

@@ -252,6 +252,7 @@ class DataLoader:
                     break
         else:
             # contain one article and multi comments
+            article['comment'] = article['comment'][:5]
             comments.append(article)
         return comments
 
