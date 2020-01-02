@@ -1,5 +1,5 @@
 import torch
-import Data as dict
+import Data as vocab
 
 
 class Beam(object):
@@ -17,11 +17,11 @@ class Beam(object):
 
         # The outputs at each time-step.
         self.nextYs = [self.tt.LongTensor(size)
-                           .fill_(dict.EOS)]
-        self.nextYs[0][0] = dict.BOS
+                           .fill_(vocab.EOS)]
+        self.nextYs[0][0] = vocab.BOS
 
         # Has EOS topped the beam yet.
-        self._eos = dict.EOS
+        self._eos = vocab.EOS
         self.eosTop = False
 
         # The attentions (matrix) for each time.
@@ -79,7 +79,7 @@ class Beam(object):
                 self.finished.append((s, len(self.nextYs) - 1, i))
 
         # End condition is when top-of-beam is EOS and no global score.
-        if self.nextYs[-1][0] == dict.EOS:
+        if self.nextYs[-1][0] == vocab.EOS:
             # self.allScores.append(self.scores)
             self.eosTop = True
 
