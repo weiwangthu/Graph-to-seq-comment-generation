@@ -1,13 +1,27 @@
-#data_path: "./data/graph_features_text_no_cd.json"
-data: "./Data/sport/"
-vocab: './Data/sport/vocab.txt'
-vocab_size: 60000
-type_num: 4
-head_num: 4
-log: './Data/sport/log/'
-epoch: 5
-batch_size: 32
-param_init: 0.1
+# data
+train_file: './ft_local/data-with-body/data.train.json'
+valid_file: './ft_local/data-with-body/data.dev.json'
+test_file: './ft_local/data-with-body/data.test.json'
+vocab_file: './ft_local/data-with-body/vocab.txt'
+vocab_size: 30000
+
+# model
+#type_num: 4
+#head_num: 4
+emb_size: 256
+encoder_hidden_size: 128
+decoder_hidden_size: 256
+num_layers: 2
+bidirec: True
+shared_vocab: True
+dropout: 0.1
+max_tgt_len: 50
+#max_sentence_len: 100
+
+# optimize
+epoch: 30
+batch_size: 64
+param_init: 0.01
 optim: 'adam'
 learning_rate: 0.0005
 max_grad_norm: 8
@@ -16,17 +30,13 @@ filter_size: 128
 learning_rate_decay: 0.5
 schedule: True
 start_decay_at: 2
-emb_size: 128
-encoder_hidden_size: 128
-decoder_hidden_size: 256
-num_layers: 2
-bidirec: True
-dropout: 0.1
-max_tgt_len: 30
-max_sentence_len: 100
-eval_interval: 1000
-save_interval: 5000
-max_generator_batches: 32
+
+# log
+log: './log/'
+eval_interval: 10000
+save_interval: 10000
 metric: ['bleu', 'xent']
-shared_vocab: True
-beam_size: 10
+
+# generate
+max_generator_batches: 32
+beam_size: 5

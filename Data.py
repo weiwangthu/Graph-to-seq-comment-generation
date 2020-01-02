@@ -17,6 +17,7 @@ BUFSIZE = 4096000
 MAX_ARTICLE_LENGTH = 600
 MAX_TITLE_LENGTH = 30
 MAX_COMMENT_LENGTH = 50
+MAX_COMMENT_NUM = 10
 
 
 class Vocab:
@@ -87,17 +88,17 @@ class Example:
         else:
             self.ori_targets = [tar[:MAX_COMMENT_LENGTH] for tar in target]
 
-        self.title = vocab.sent2id(title)
+        self.title = vocab.sent2id(self.ori_title)
         self.original_content = vocab.sent2id(self.ori_original_content)
         if is_train:
-            self.target = vocab.sent2id(target, add_start=True, add_end=True)
+            self.target = vocab.sent2id(self.ori_target, add_start=True, add_end=True)
 
         self.sentence_content = split_chinese_sentence(self.ori_original_content)
         self.sentence_content = [vocab.sent2id(sen[:MAX_ARTICLE_LENGTH]) for sen in self.sentence_content]
         self.sentence_content_max_len = Batch.get_length(self.sentence_content, MAX_ARTICLE_LENGTH)
-        self.sentence_content, self.sentence_content_mask = Batch.padding_list_to_tensor(self.sentence_content, self.sentence_content_max_len.max())
+        self.sentence_content, self.sentence_content_mask = Batch.padding_list_to_tensor(self.sentence_content, self.sentence_content_max_len.max().item())
 
-        self.bow = self.bow_vec(self.original_content, MAX_ARTICLE_LENGTH)
+        self.bow = self.bow_vec(original_content, MAX_ARTICLE_LENGTH)
 
     def bow_vec(self, content, max_len):
         bow = {}
@@ -126,30 +127,30 @@ class Batch:
             self.sentence_content_mask = [e.sentence_content_mask for e in example_list]
 
             self.sentence_len = self.get_length(self.sentence_content)
-            self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_len], self.sentence_len.max())
+            self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_len], self.sentence_len.max().item())
             self.sentence_mask = self.sentence_mask.to(torch.uint8)
 
         elif model == 'select2seq' or 'seq2seq':
             content_list = [e.original_content for e in example_list]
             self.content_len = self.get_length(content_list, MAX_ARTICLE_LENGTH)
-            self.content, self.content_mask = self.padding_list_to_tensor(content_list, self.content_len.max())
+            self.content, self.content_mask = self.padding_list_to_tensor(content_list, self.content_len.max().item())
 
             title_list = [e.title for e in example_list]
             self.title_len = self.get_length(title_list, MAX_TITLE_LENGTH)
-            self.title, self.title_mask = self.padding_list_to_tensor(title_list, self.title_len.max())
+            self.title, self.title_mask = self.padding_list_to_tensor(title_list, self.title_len.max().item())
 
             title_content_list = [e.title + e.original_content for e in example_list]
             self.title_content_len = self.get_length(title_content_list, MAX_TITLE_LENGTH + MAX_ARTICLE_LENGTH)
-            self.title_content, self.title_content_mask = self.padding_list_to_tensor(title_content_list, self.title_content_len.max())
+            self.title_content, self.title_content_mask = self.padding_list_to_tensor(title_content_list, self.title_content_len.max().item())
 
         elif model == 'bow2seq':
             bow_list = [e.bow for e in example_list]
             self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
-            self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max())
+            self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
 
         if is_train:
             self.tgt_len = self.get_length([e.target for e in example_list])
-            self.tgt, self.tgt_mask = self.padding_list_to_tensor([e.target for e in example_list], self.tgt_len.max())
+            self.tgt, self.tgt_mask = self.padding_list_to_tensor([e.target for e in example_list], self.tgt_len.max().item())
 
     @staticmethod
     def get_length(examples, max_len=1000):
@@ -207,12 +208,12 @@ class DataLoader:
         self.model = model
 
     def __iter__(self):
-        lines = self.stream.readlines(BUFSIZE)
+        lines = self.stream.readlines()
         if not lines:
             self.epoch_id += 1
             self.stream.close()
             self.stream = open(self.filename, encoding='utf8')
-            lines = self.stream.readlines(BUFSIZE)
+            lines = self.stream.readlines()
 
         articles = []
         for line in lines:
@@ -246,6 +247,9 @@ class DataLoader:
                 item['body'] = article['body']
                 item['comment'] = article['comment'][i][0]
                 comments.append(item)
+
+                if len(comments) >= MAX_COMMENT_NUM:
+                    break
         else:
             # contain one article and multi comments
             comments.append(article)
@@ -261,7 +265,7 @@ class DataLoader:
                 target = [s[0].split()for s in g['comment']]
 
             title = g["title"].split()
-            original_content = g["text"].split()
+            original_content = g["body"].split()
 
             e = Example(original_content, title, target, self.vocab, self.is_train)
             results.append(e)

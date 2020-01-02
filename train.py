@@ -1,23 +1,23 @@
 from __future__ import division
 from __future__ import print_function
 
-import time
 import argparse
+import os
+import random
+import sys
+import time
+
 import torch
 import torch.nn as nn
-from optims import Optim
-import util
-from util import utils
-import lr_scheduler as L
-from models import *
-from collections import OrderedDict
 from tqdm import tqdm
-import sys
-import os
 
-parent_dir = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
-current_dir = os.getcwd()
-sys.path.insert(0, parent_dir)
+import lr_scheduler as L
+import util
+from optims import Optim
+from util import utils
+from Data import Vocab, DataLoader
+from models import *
+
 from util.nlp_utils import *
 
 
@@ -59,7 +59,6 @@ def parse_args():
                         help='whether to use debug mode')
 
     opt = parser.parse_args()
-    # 用config.data来得到config中的data选项
     config = util.utils.read_config(opt.config)
     return opt, config
 
@@ -71,7 +70,6 @@ np.random.seed(args.seed)
 
 
 # Training settings
-
 def set_up_logging():
     # log为记录文件
     # config.log是记录的文件夹, 最后一定是/
@@ -96,12 +94,13 @@ logging, logging_csv, log_path = set_up_logging()
 use_cuda = torch.cuda.is_available()
 
 
-def train(model, vocab, dataloader, scheduler, optim, updates):
+def train(model, vocab, train_data, valid_data, scheduler, optim, updates):
     scores = []
     max_bleu = 0.
     for epoch in range(1, config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
+        local_updates = 0
         start_time = time.time()
 
         if config.schedule:
@@ -110,7 +109,6 @@ def train(model, vocab, dataloader, scheduler, optim, updates):
 
         model.train()
 
-        train_data = dataloader.train_batches
         for batch in tqdm(train_data, disable=not args.verbose):
             model.zero_grad()
             outputs = model(batch, use_cuda)
@@ -130,45 +128,48 @@ def train(model, vocab, dataloader, scheduler, optim, updates):
             total_acc += acc
 
             optim.step()
-            updates += 1  # 进行了一次更新
+            updates += 1
+            local_updates += 1
 
-            # 多少次更新之后记录一次
             if updates % config.eval_interval == 0 or args.debug:
-                # logging中记录的是每次更新时的epoch，time，updates，correct等基本信息.
-                # 还有score分数的信息
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
-                        % (time.time() - start_time, epoch, updates, total_loss / config.eval_interval,
-                           total_acc / config.eval_interval))
-                print('evaluating after %d updates...\r' % updates)
+                        % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+                print('evaluating after %d updates...' % updates)
                 # TODO: fix eval and print bleu, ppl
-                score = eval(model, vocab, dataloader, epoch, updates)
+                score = eval_loss(model, vocab, valid_data, epoch, updates)
                 scores.append(score)
-                if score >= max_bleu:
-                    save_model(log_path + str(score) + '_checkpoint.pt', model, optim, updates)
+                if score <= max_bleu:
+                    save_model(log_path + 'checkpoint_best_%d_%d_%f.pt'%(epoch, updates, score), model, optim, epoch, updates)
                     max_bleu = score
 
                 model.train()
-                total_loss = 0.
-                total_acc = 0.
-                start_time = time.time()
-                # report_correct = 0
-                report_total = 0
-                # report_vocab, report_tot_vocab = 0, 0
+                # total_loss = 0.
+                # total_acc = 0.
+                # start_time = time.time()
 
-            if updates % config.save_interval == 0:  # 多少次更新后进行保存一次
-                save_model(log_path + str(updates) + '_updates_checkpoint.pt', model, optim, updates)
+            if updates % config.save_interval == 0:
+                save_model(log_path + 'checkpoint_%d_%d.pt'%(epoch, updates), model, optim, epoch, updates)
+
+        # eval and save model after each epoch
+        logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
+                % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+        print('evaluating after %d updates...' % updates)
+        # TODO: fix eval and print bleu, ppl
+        score = eval_loss(model, vocab, valid_data, epoch, updates)
+        scores.append(score)
+        if score <= max_bleu:
+            save_model(log_path + 'checkpoint_best_%d_%f.pt'%(epoch, score), model, optim, epoch, updates)
+            max_bleu = score
+
+        save_model(log_path + 'checkpoint_%d.pt'%epoch, model, optim, epoch, updates)
     return max_bleu
 
 
-def eval(model, vocab, dataloader, epoch, updates, do_test=False):
+def eval(model, vocab, valid_data, epoch, updates):
     model.eval()
     multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
-    if do_test:
-        data_batches = dataloader.test_batches
-    else:
-        data_batches = dataloader.dev_batches
-    i = 0
-    for batch in tqdm(data_batches, disable=not args.verbose):
+
+    for batch in tqdm(valid_data, disable=not args.verbose):
         if len(args.gpus) > 1 or not args.beam_search:
             samples, alignment = model.sample(batch, use_cuda)
         else:
@@ -193,15 +194,39 @@ def eval(model, vocab, dataloader, epoch, updates, do_test=False):
     return bleu
 
 
-def save_model(path, model, optim, updates):
-    '''保存的模型是一个字典的形式, 有model, config, optim, updates.'''
+def eval_loss(model, vocab, valid_data, epoch, updates):
+    model.eval()
 
-    # 如果使用并行的话使用的是model.module.state_dict()
+    total_acc = 0.
+    total_loss = 0.
+    local_updates = 0
+    for batch in tqdm(valid_data, disable=not args.verbose):
+        outputs = model(batch, use_cuda)
+        target = batch.tgt
+        if use_cuda:
+            target = target.cuda()
+        if isinstance(outputs, dict):
+            loss, acc = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+        else:
+            loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
+
+        total_loss += loss.data.item()
+        total_acc += acc
+        local_updates += 1
+
+    avg_loss, avg_acc = total_loss/local_updates, total_acc/local_updates
+    text_result = 'loss=%f, acc=%f' % (avg_loss, avg_acc)
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+    return avg_loss
+
+def save_model(path, model, optim, epoch, updates):
     model_state_dict = model.module.state_dict() if len(args.gpus) > 1 else model.state_dict()
     checkpoints = {
         'model': model_state_dict,
         'config': config,
         'optim': optim,
+        'epcoh': epoch,
         'updates': updates}
     torch.save(checkpoints, path)
 
@@ -214,27 +239,17 @@ def main():
 
     # checkpoint
     if args.restore:  # 存储已有模型的路径
-        print('loading checkpoint...\n')
+        print('loading checkpoint...')
         checkpoints = torch.load(os.path.join(log_path, args.restore))
 
-    # contentfile = os.path.join(config.data, "segged_content.txt")
-    # word2id, id2word, word2count = load_vocab(args.vocab_file, args.vocab_size)
-    vocab = Vocab(config.vocab, config.data, config.vocab_size)
+    vocab = Vocab(config.vocab_file, config.vocab_size)
 
     # Load data
-    start_time = time.time()
     use_gnn = False
     if args.graph_model == 'GNN':
         use_gnn = True
-    dataloader = DataLoader(config, config.data, config.batch_size, vocab, args.adj, use_gnn, args.model, args.notrain,
-                            args.debug)
-    print("DATA loaded!")
-
-    torch.backends.cudnn.benchmark = True
-
-    # data
-    print('loading data...\n')
-    print('loading time cost: %.3f' % (time.time() - start_time))
+    train_data = DataLoader(config.train_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug)
+    valid_data = DataLoader(config.valid_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug)
 
     # model
     print('building model...\n')
@@ -254,10 +269,9 @@ def main():
         model.load_state_dict(checkpoints['model'])
     if use_cuda:
         model.cuda()
-        # lm_model.cuda()
-    if len(args.gpus) > 1:  # 并行
+    if len(args.gpus) > 1:
         model = nn.DataParallel(model, device_ids=args.gpus, dim=1)
-    logging(repr(model) + "\n\n")  # 记录这个文件的框架
+    logging(repr(model) + "\n\n")
 
     # total number of parameters
     param_count = 0
@@ -266,7 +280,6 @@ def main():
 
     logging('total number of parameters: %d\n\n' % param_count)
 
-    # updates是已经进行了几个epoch, 防止中间出现程序中断的情况.
     if args.restore:
         updates = checkpoints['updates']
         ori_updates = updates
@@ -280,8 +293,6 @@ def main():
         optim = Optim(config.optim, config.learning_rate, config.max_grad_norm,
                       lr_decay=config.learning_rate_decay, start_decay_at=config.start_decay_at)
 
-    # if opt.pretrain:
-    # pretrain_lm(lm_model, vocab)
     optim.set_parameters(model.parameters())
     if config.schedule:
         scheduler = L.CosineAnnealingLR(optim.optimizer, T_max=config.epoch)
@@ -289,11 +300,11 @@ def main():
         scheduler = None
 
     if not args.notrain:
-        max_bleu = train(model, vocab, dataloader, scheduler, optim, updates)
-        logging("Best bleu score: %.2f\n" % (max_bleu))
+        max_bleu = train(model, vocab, train_data, valid_data, scheduler, optim, updates)
+        logging("Best bleu score: %.2f\n" % max_bleu)
     else:
         assert args.restore is not None
-        eval(model, vocab, dataloader, 0, updates, do_test=False)
+        eval(model, vocab, valid_data, 100, updates)
 
 
 if __name__ == '__main__':
