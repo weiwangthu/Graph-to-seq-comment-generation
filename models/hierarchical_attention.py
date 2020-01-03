@@ -53,9 +53,9 @@ class hierarchical_attention(nn.Module):
             self.embedding = pretrain['emb']
         else:
             self.embedding = nn.Embedding(self.vocab_size, config.emb_size)
-        self.word_encoder = Encoder(config.emb_size, config.emb_size, config.num_layers, config.dropout, config.bidirec)
-        self.word_attentive_pool = attentive_pooling(config.emb_size * 2)
-        self.sentence_encoder = Encoder(config.emb_size * 2, config.emb_size * 2, config.num_layers,
+        self.word_encoder = Encoder(config.emb_size, config.encoder_hidden_size, config.num_layers, config.dropout, config.bidirec)
+        self.word_attentive_pool = attentive_pooling(config.encoder_hidden_size * 2)
+        self.sentence_encoder = Encoder(config.encoder_hidden_size * 2, config.encoder_hidden_size * 2, config.num_layers,
                                         config.dropout, config.bidirec)
         self.sentence_attentive_pool = attentive_pooling(config.decoder_hidden_size)
         self.decoder = models.rnn_decoder(config, self.vocab_size, embedding=self.embedding)

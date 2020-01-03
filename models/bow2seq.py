@@ -21,7 +21,7 @@ class bow2seq(nn.Module):
         # self.encoder = models.GCN_Encoder(config, self.vocab_size, embedding=self.embedding)
         self.bert_encoder = models.bert.BERT(config.head_num, config.emb_size, config.dropout,
                                              config.emb_size, self.vocab_size, config.num_layers,
-                                             config.max_sentence_len, word_emb=self.embedding)
+                                             config.max_article_len, word_emb=self.embedding)
         self.decoder = models.rnn_decoder(config, self.vocab_size, embedding=self.embedding)
         self.proj = nn.Linear(config.emb_size, config.decoder_hidden_size)
         self.state_wc = nn.Linear(config.decoder_hidden_size, config.decoder_hidden_size * config.num_layers)

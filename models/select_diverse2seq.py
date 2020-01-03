@@ -13,11 +13,10 @@ class SelectGate(nn.Module):
     def __init__(self, config):
         super(SelectGate, self).__init__()
         self.linear = nn.Linear(config.encoder_hidden_size * 4, 2)
-        self.sigmoid = nn.Softmax()
 
     def forward(self, contexts, title_context):
         title_context = title_context.unsqueeze(1).expand(-1, contexts.size(1), -1)
-        gates = self.sigmoid(self.linear(torch.cat([contexts, title_context], dim=-1)))
+        gates = F.softmax(self.linear(torch.cat([contexts, title_context], dim=-1)), dim=-1)
         return gates
 
 
@@ -125,7 +124,7 @@ class select_diverse2seq(nn.Module):
     def topic_attention(self, comment, topics):
         comment = comment.unsqueeze(2)  # bsz * n_hidden * 1
         weights = torch.bmm(topics, comment).squeeze(2)  # bsz * n_topic
-        weights = F.softmax(weights)
+        weights = F.softmax(weights, dim=-1)
         return weights
 
     def sample(self, batch, use_cuda):

@@ -121,6 +121,9 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, updates):
                 loss, acc = model.compute_loss(outputs, target.transpose(0, 1)[1:])
             else:
                 loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
+            if torch.isnan(loss):
+                raise Exception('nan error')
+
             loss.backward()
             total_loss += loss.data.item()
             total_acc += acc.data.item()

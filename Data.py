@@ -98,7 +98,7 @@ class Example:
         self.sentence_content_max_len = Batch.get_length(self.sentence_content, MAX_ARTICLE_LENGTH)
         self.sentence_content, self.sentence_content_mask = Batch.padding_list_to_tensor(self.sentence_content, self.sentence_content_max_len.max().item())
 
-        self.bow = self.bow_vec(original_content, MAX_ARTICLE_LENGTH)
+        self.bow = self.bow_vec(self.original_content, MAX_ARTICLE_LENGTH)
 
     def bow_vec(self, content, max_len):
         bow = {}
@@ -126,11 +126,11 @@ class Batch:
             self.sentence_content = [e.sentence_content for e in example_list]
             self.sentence_content_mask = [e.sentence_content_mask for e in example_list]
 
-            self.sentence_len = self.get_length(self.sentence_content)
-            self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_len], self.sentence_len.max().item())
+            self.sentence_content_len = self.get_length(self.sentence_content)
+            self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_content_len], self.sentence_content_len.max().item())
             self.sentence_mask = self.sentence_mask.to(torch.uint8)
 
-        elif model == 'select_diverse2seq' or 'seq2seq':
+        elif model == 'select_diverse2seq' or model == 'seq2seq':
             content_list = [e.original_content for e in example_list]
             self.content_len = self.get_length(content_list, MAX_ARTICLE_LENGTH)
             self.content, self.content_mask = self.padding_list_to_tensor(content_list, self.content_len.max().item())
