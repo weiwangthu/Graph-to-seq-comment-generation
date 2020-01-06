@@ -96,17 +96,17 @@ logging, logging_csv, log_path = set_up_logging()
 use_cuda = torch.cuda.is_available()
 
 
-def train(model, vocab, train_data, valid_data, scheduler, optim, updates):
+def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, updates):
     scores = []
     max_bleu = 10.
-    for epoch in range(1, config.epoch + 1):
+    for epoch in range(org_epoch + 1, org_epoch + config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
         local_updates = 0
         start_time = time.time()
 
         if config.schedule:
-            scheduler.step()
+            scheduler.step(epoch-1)
             print("Decaying learning rate to %g" % scheduler.get_lr()[0])
 
         model.train()
@@ -288,9 +288,11 @@ def main():
 
     if args.restore:
         updates = checkpoints['updates']
-        ori_updates = updates
+        epoch = checkpoints['epcoh']
+        logging('restore from: %d epcoh, %d update\n\n' % (epoch, updates))
     else:
         updates = 0
+        epoch = 0
 
     # optimizer
     if args.restore:
@@ -306,7 +308,7 @@ def main():
         scheduler = None
 
     if not args.notrain:
-        max_bleu = train(model, vocab, train_data, valid_data, scheduler, optim, updates)
+        max_bleu = train(model, vocab, train_data, valid_data, scheduler, optim, epoch, updates)
         logging("Best bleu score: %.2f\n" % max_bleu)
     else:
         assert args.restore is not None
