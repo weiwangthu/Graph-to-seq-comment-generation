@@ -26,11 +26,8 @@ CUDA_VISIBLE_DEVICES=2 python train.py -gpus 2 -model graph2seq -use_copy -log g
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 3 -model graph2seq -log graph2seq_wo_copy_gcn
 
 
-CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -model select_diverse2seq -log select_diverse2seq
-
-
 # generate
-CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -model seq2seq -log seq2seq_t -notrain -restore checkpoint_3_80000.pt
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -model seq2seq -log seq2seq_t -notrain -restore checkpoint_best_25_4.496477.pt -beam_search
 
 
 # restore
@@ -42,3 +39,13 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 3 -model h_attention -log 5c_h_atte
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 0 -model seq2seq -log 5c_seq2seq_t -restore checkpoint_19.pt
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -model seq2seq -use_content -log 5c_seq2seq_tc -restore checkpoint_10.pt
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 2 -model bow2seq -log 5c_bow2seq_b -restore checkpoint_16.pt
+
+
+# debug own model
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -model select2seq -log 5c_select2seq
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -model select2seq -log 5c_select2seq_tau1.0
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -model select2seq -log 5c_select2seq_tau0.5_gama0.5_e4
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -model select_var_diverse2seq -log 5c_select_var_diverse2seq_tau0.5_gama0_kld0
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content -model select_var_diverse2seq -log 5c_select_var_diverse2seq_tau0.5_gama0_kld0.4
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content -model var_select_var_diverse2seq -log 5c_var_select_var_diverse2seq_tau0.5_gama0_kld0_sel0
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -model var_select_var_diverse2seq -log 5c_var_select_var_diverse2seq_tau0.5_gama0_kld0_sel0.4
