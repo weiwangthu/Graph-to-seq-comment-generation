@@ -24,6 +24,9 @@ head_num: 4
 tau: 0.5
 gama1: 0.0
 gama2: 0.0
+gama_kld: 0.0
+gama_select: 0.0
+n_z: 256
 
 # optimize
 epoch: 40

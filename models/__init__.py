@@ -10,3 +10,6 @@ from models.seq2seq import *
 from models.bow2seq import *
 from models.hierarchical_attention import hierarchical_attention
 from models.select_diverse2seq import select_diverse2seq
+from models.select2seq import select2seq
+from models.select_var_diverse2seq import select_var_diverse2seq
+from models.var_select_var_diverse2seq import var_select_var_diverse2seq
