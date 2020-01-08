@@ -129,8 +129,12 @@ class Batch:
             self.sentence_content_len = self.get_length(self.sentence_content)
             self.sentence_mask, _ = self.padding_list_to_tensor([[1 for _ in range(d)] for d in self.sentence_content_len], self.sentence_content_len.max().item())
             self.sentence_mask = self.sentence_mask.to(torch.uint8)
-
-        elif model == 'select_diverse2seq' or model == 'seq2seq':
+        elif model == 'bow2seq':
+            bow_list = [e.bow for e in example_list]
+            self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
+            self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
+        # seq2seq, select_diverse2seq, select2seq and so on.
+        else:
             content_list = [e.original_content for e in example_list]
             self.content_len = self.get_length(content_list, MAX_ARTICLE_LENGTH)
             self.content, self.content_mask = self.padding_list_to_tensor(content_list, self.content_len.max().item())
@@ -142,11 +146,6 @@ class Batch:
             title_content_list = [e.title + e.original_content for e in example_list]
             self.title_content_len = self.get_length(title_content_list, MAX_TITLE_LENGTH + MAX_ARTICLE_LENGTH)
             self.title_content, self.title_content_mask = self.padding_list_to_tensor(title_content_list, self.title_content_len.max().item())
-
-        elif model == 'bow2seq':
-            bow_list = [e.bow for e in example_list]
-            self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
-            self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
 
         if is_train:
             self.tgt_len = self.get_length([e.target for e in example_list])

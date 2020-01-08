@@ -6,6 +6,7 @@ import os
 import random
 import sys
 import time
+import collections
 
 import torch
 import torch.nn as nn
@@ -19,6 +20,7 @@ from Data import Vocab, DataLoader
 from models import *
 
 from util.nlp_utils import *
+from util.misc_utils import AverageMeter
 
 
 # config
@@ -32,7 +34,7 @@ def parse_args():
     parser.add_argument('-config', default='config.yaml', type=str,
                         help="config file")
     parser.add_argument('-model', default='graph2seq', type=str,
-                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq'])
+                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq', 'select2seq', 'select_var_diverse2seq', 'var_select_var_diverse2seq'])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
     parser.add_argument('-use_copy', default=False, action="store_true",
@@ -96,14 +98,15 @@ logging, logging_csv, log_path = set_up_logging()
 use_cuda = torch.cuda.is_available()
 
 
-def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, updates):
+def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, updates, org_best_score=None):
     scores = []
-    max_bleu = 10.
+    best_score = org_best_score if org_best_score is not None else 10.
     for epoch in range(org_epoch + 1, org_epoch + config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
         local_updates = 0
         start_time = time.time()
+        extra_meters = collections.defaultdict(lambda: AverageMeter())
 
         if config.schedule:
             scheduler.step(epoch-1)
@@ -118,7 +121,16 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
             if use_cuda:
                 target = target.cuda()
             if isinstance(outputs, dict):
-                loss, acc = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+                result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+                loss = result['loss']
+                acc = result['acc']
+
+                # get other loss information
+                for k, v in result.items():
+                    if k in ['loss', 'acc']:
+                        continue  # these are already logged above
+                    else:
+                        extra_meters[k].update(v.item())
             else:
                 loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
             if torch.isnan(loss):
@@ -135,6 +147,11 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
             if updates % config.print_interval == 0 or args.debug:
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
                         % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+
+                # log other loss
+                if len(extra_meters) > 0:
+                    other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
+                    logging(other_information + '\n')
 
             # if updates % config.eval_interval == 0 or args.debug:
             #     print('evaluating after %d updates...' % updates)
@@ -155,18 +172,24 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
         # log information
         logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
                 % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+        # log other loss
+        if len(extra_meters) > 0:
+            other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
+            logging(other_information + '\n')
 
         # eval and save model after each epoch
         print('evaluating after %d updates...' % updates)
         score = eval_loss(model, vocab, valid_data, epoch, updates)
         scores.append(score)
 
-        if score <= max_bleu:
-            save_model(log_path + 'checkpoint_best_%d_%f.pt' % (epoch, score), model, optim, epoch, updates)
-            max_bleu = score
+        if score <= best_score:
+            save_model(log_path + 'checkpoint_best.pt', model, optim, epoch, updates, best_score)
+            best_score = score
 
-        save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates)
-    return max_bleu
+        # save every epoch
+        save_model(log_path + 'checkpoint_last.pt', model, optim, epoch, updates, best_score)
+        save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates, best_score)
+    return best_score
 
 
 def eval_bleu(model, vocab, valid_data, epoch, updates):
@@ -204,13 +227,23 @@ def eval_loss(model, vocab, valid_data, epoch, updates):
     total_acc = 0.
     total_loss = 0.
     local_updates = 0
+    extra_meters = collections.defaultdict(lambda: AverageMeter())
     for batch in tqdm(valid_data, disable=not args.verbose):
         outputs = model(batch, use_cuda)
         target = batch.tgt
         if use_cuda:
             target = target.cuda()
         if isinstance(outputs, dict):
-            loss, acc = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+            result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+            loss = result['loss']
+            acc = result['acc']
+
+            # get other loss information
+            for k, v in result.items():
+                if k in ['loss', 'acc']:
+                    continue  # these are already logged above
+                else:
+                    extra_meters[k].update(v.item())
         else:
             loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
 
@@ -220,35 +253,37 @@ def eval_loss(model, vocab, valid_data, epoch, updates):
 
     avg_loss, avg_acc = total_loss/local_updates, total_acc/local_updates
     text_result = 'loss=%f, acc=%f' % (avg_loss, avg_acc)
+    # log other loss
+    if len(extra_meters) > 0:
+        other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
+        text_result = ','.join([text_result, other_information])
+
     logging_csv([epoch, updates, text_result])
     print(text_result, flush=True)
     return avg_loss
 
-def save_model(path, model, optim, epoch, updates):
+def save_model(path, model, optim, epoch, updates, score):
     model_state_dict = model.module.state_dict() if len(args.gpus) > 1 else model.state_dict()
     checkpoints = {
         'model': model_state_dict,
         'config': config,
         'optim': optim,
         'epcoh': epoch,
-        'updates': updates}
+        'updates': updates,
+        'best_eval_score': score
+    }
     torch.save(checkpoints, path)
 
 
 def main():
-    # 设定种子
+    # set seed
     torch.manual_seed(args.seed)
     if use_cuda:
         torch.cuda.manual_seed(args.seed)
 
-    # checkpoint
-    if args.restore:  # 存储已有模型的路径
-        print('loading checkpoint...')
-        checkpoints = torch.load(os.path.join(log_path, args.restore))
-
     vocab = Vocab(config.vocab_file, config.vocab_size)
 
-    # Load data
+    # load data
     use_gnn = False
     if args.graph_model == 'GNN':
         use_gnn = True
@@ -260,8 +295,7 @@ def main():
     # configure the model
     # Model and optimizer
     if args.model == 'graph2seq':
-        model = graph2seq(config, vocab, use_cuda, args.use_copy, args.use_bert, args.word_level_model,
-                          args.graph_model)
+        model = graph2seq(config, vocab, use_cuda, args.use_copy, args.use_bert, args.word_level_model, args.graph_model)
     elif args.model == 'seq2seq':
         model = seq2seq(config, vocab, use_cuda, use_content=args.use_content)
     elif args.model == 'bow2seq':
@@ -270,29 +304,42 @@ def main():
         model = hierarchical_attention(config, vocab, use_cuda)
     elif args.model == 'select_diverse2seq':
         model = select_diverse2seq(config, vocab, use_cuda)
+    elif args.model == 'select2seq':
+        model = select2seq(config, vocab, use_cuda)
+    elif args.model == 'select_var_diverse2seq':
+        model = select_var_diverse2seq(config, vocab, use_cuda)
+    elif args.model == 'var_select_var_diverse2seq':
+        model = var_select_var_diverse2seq(config, vocab, use_cuda)
 
+    # total number of parameters
+    logging(repr(model) + "\n\n")
+    param_count = 0
+    for param in model.parameters():
+        param_count += param.view(-1).size()[0]
+    logging('total number of parameters: %d\n\n' % param_count)
+
+    # load best or last checkpoint
     if args.restore:
+        print('loading checkpoint...')
+        checkpoints = torch.load(os.path.join(log_path, args.restore))
         model.load_state_dict(checkpoints['model'])
+
+        # load other information
+        updates = checkpoints['updates']
+        epoch = checkpoints['epcoh']
+        best_score = checkpoints['best_eval_score']
+        logging('restore from: %d epcoh, %d update\n\n' % (epoch, updates))
+    else:
+        # set other information
+        updates = 0
+        epoch = 0
+        best_score = None
+
+    # set cuda
     if use_cuda:
         model.cuda()
     if len(args.gpus) > 1:
         model = nn.DataParallel(model, device_ids=args.gpus, dim=1)
-    logging(repr(model) + "\n\n")
-
-    # total number of parameters
-    param_count = 0
-    for param in model.parameters():
-        param_count += param.view(-1).size()[0]
-
-    logging('total number of parameters: %d\n\n' % param_count)
-
-    if args.restore:
-        updates = checkpoints['updates']
-        epoch = checkpoints['epcoh']
-        logging('restore from: %d epcoh, %d update\n\n' % (epoch, updates))
-    else:
-        updates = 0
-        epoch = 0
 
     # optimizer
     if args.restore:
@@ -308,12 +355,12 @@ def main():
         scheduler = None
 
     if not args.notrain:
-        max_bleu = train(model, vocab, train_data, valid_data, scheduler, optim, epoch, updates)
-        logging("Best bleu score: %.2f\n" % max_bleu)
+        best_score = train(model, vocab, train_data, valid_data, scheduler, optim, epoch, updates, best_score)
+        logging("Best score: %.6f\n" % best_score)
     else:
         assert args.restore is not None
         test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug)
-        eval_bleu(model, vocab, test_data, 100, updates)
+        eval_bleu(model, vocab, test_data, epoch, updates)
 
 
 if __name__ == '__main__':
