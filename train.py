@@ -327,7 +327,7 @@ def main():
         # load other information
         updates = checkpoints['updates']
         epoch = checkpoints['epcoh']
-        best_score = checkpoints['best_eval_score']
+        best_score = checkpoints['best_eval_score'] if 'best_eval_score' in checkpoints else 10.0
         logging('restore from: %d epcoh, %d update\n\n' % (epoch, updates))
     else:
         # set other information

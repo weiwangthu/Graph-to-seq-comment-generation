@@ -23,7 +23,7 @@ class seq2seq(nn.Module):
         self.config = config
         self.use_content = use_content
         self.criterion = models.criterion(self.vocab_size, use_cuda)
-        self.log_softmax = nn.LogSoftmax()
+        self.log_softmax = nn.LogSoftmax(-1)
         self.tanh = nn.Tanh()
 
     def compute_loss(self, hidden_outputs, targets):
@@ -100,7 +100,7 @@ class seq2seq(nn.Module):
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
-            output = unbottle(self.log_softmax(output, -1))
+            output = unbottle(self.log_softmax(output))
             attn = unbottle(attn)
             # beam x tgt_vocab
 
