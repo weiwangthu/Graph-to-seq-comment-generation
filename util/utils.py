@@ -151,6 +151,12 @@ def write_result_to_file(examples, candidates, log_path):
             f.write("".join(e.ori_original_content).strip() + '\t')
             # f.write("$$".join(["".join(comment).strip() for comment in e.ori_targets]) + '\t')
             f.write("\n")
+    log_file = log_path + '/result_for_test.tsv'
+    with codecs.open(log_file, 'w', 'utf-8') as f:
+        for e, cand in zip(examples, candidates):
+            f.write(str(e.ori_news_id) + '\t')
+            f.write(" ".join(cand).strip())
+            f.write("\n")
 
 
 def count_entity_num(candidates, tags):

@@ -80,9 +80,10 @@ class Example:
         memory: tag (oov has extend ids)
     """
 
-    def __init__(self, original_content, title, target, vocab, is_train):
+    def __init__(self, original_content, title, target, vocab, is_train, news_id):
         self.ori_title = title[:MAX_TITLE_LENGTH]
         self.ori_original_content = original_content[:MAX_ARTICLE_LENGTH]
+        self.ori_news_id = news_id
         if is_train:
             self.ori_target = target[:MAX_COMMENT_LENGTH]
         else:
@@ -267,7 +268,11 @@ class DataLoader:
             title = g["title"].split()
             original_content = g["body"].split()
 
-            e = Example(original_content, title, target, self.vocab, self.is_train)
+            news_id = None
+            if not self.is_train:
+                news_id = g["id"]
+
+            e = Example(original_content, title, target, self.vocab, self.is_train, news_id=news_id)
             results.append(e)
         return results
 

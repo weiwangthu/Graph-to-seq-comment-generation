@@ -29,46 +29,41 @@ class seq2seq(nn.Module):
     def compute_loss(self, hidden_outputs, targets):
         return models.cross_entropy_loss(hidden_outputs, targets, self.criterion)
 
-    def forward(self, batch, use_cuda):
-        if self.use_content:
-            src, src_len, src_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
-        else:
-            src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
-        tgt = batch.tgt
-        if use_cuda:
-            src, src_len, tgt, src_mask = src.cuda(), src_len.cuda(), tgt.cuda(), src_mask.cuda()
-        contexts, state = self.encoder(src, src_len)
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts)
-        return outputs
-
-    def sample(self, batch, use_cuda):
+    def encode(self, batch, use_cuda):
         if self.use_content:
             src, src_len, src_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
         else:
             src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
         if use_cuda:
             src, src_len, src_mask = src.cuda(), src_len.cuda(), src_mask.cuda()
-        bos = torch.ones(src.size(0)).long().fill_(self.vocab.word2id('[START]'))
-        bos = bos.to(src.device)
-
         contexts, state = self.encoder(src, src_len)
+        return contexts, state
+
+    def forward(self, batch, use_cuda):
+        contexts, state = self.encode(batch, use_cuda)
+        tgt = batch.tgt
+        if use_cuda:
+            tgt = tgt.cuda()
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts)
+        return outputs
+
+    def sample(self, batch, use_cuda):
+        contexts, state = self.encode(batch, use_cuda)
+
+        bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
+        bos = bos.to(contexts.device)
         sample_ids, final_outputs = self.decoder.sample([bos], state, contexts)
 
         return sample_ids, final_outputs[1]
 
     # TODO: fix beam search
     def beam_sample(self, batch, use_cuda, beam_size=1):
-        if self.use_title:
-            src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
-        else:
-            src, src_len, src_mask = batch.ori_content, batch.ori_content_len, batch.ori_content_mask
-        if use_cuda:
-            src, src_len, src_mask = src.cuda(), src_len.cuda(), src_mask.cuda()
-        # beam_size = self.config.beam_size
-        batch_size = src.size(0)
-
         # (1) Run the encoder on the src. Done!!!!
-        contexts, encState = self.encoder(src, src_len)
+        contexts, enc_state = self.encode(batch, use_cuda)
+
+        batch_size = contexts.size(0)
+        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
+                for _ in range(batch_size)]
 
         #  (1b) Initialize for the decoder.
         def rvar(a):
@@ -81,16 +76,13 @@ class seq2seq(nn.Module):
         # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
         # (batch, seq) -> (beam*batch, seq)
-        src_mask = src_mask.repeat(beam_size, 1)
-        assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
-        assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
-        decState = (rvar(encState[0]), rvar(encState[1]))  # layer, beam*batch, nh
+        # src_mask = src_mask.repeat(beam_size, 1)
+        # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
+        # assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
+        dec_state = (rvar(enc_state[0]), rvar(enc_state[1]))  # layer, beam*batch, nh
         # decState.repeat_beam_size_times(beam_size)
-        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
-                for _ in range(batch_size)]
 
         # (2) run the decoder to generate sentences, using beam search.
-
         for i in range(self.config.max_tgt_len):
 
             if all((b.done() for b in beam)):
@@ -104,7 +96,7 @@ class seq2seq(nn.Module):
                 inp = inp.cuda()
 
             # Run one step.
-            output, decState, attn = self.decoder.sample_one(inp, decState, contexts, src_mask)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
@@ -116,7 +108,7 @@ class seq2seq(nn.Module):
             # update state
             for j, b in enumerate(beam):  # there are batch size beams!!! so here enumerate over batch
                 b.advance(output.data[:, j], attn.data[:, j])  # output is beam first
-                b.beam_update(decState, j)
+                b.beam_update(dec_state, j)
 
         # (3) Package everything up.
         allHyps, allScores, allAttn = [], [], []

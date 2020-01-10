@@ -158,15 +158,15 @@ class rnn_decoder(nn.Module):
 
     def sample(self, input, init_state, contexts=None):
         # emb = self.embedding(input)
-        inputs, outputs, sample_ids, state = [], [], [], init_state
-        attns = []
+        inputs, sample_ids = [], []
         inputs += input
+
+        outputs, state, attns = [], init_state, []
         max_time_step = self.config.max_tgt_len
 
         for i in range(max_time_step):
             # output: [batch, tgt_vocab_size]
-            output, state, attn_weights = self.sample_one(inputs[i], state,
-                                                          contexts)  # inputs is a list we just built, not a big batch
+            output, state, attn_weights = self.sample_one(inputs[i], state, contexts)  # inputs is a list we just built, not a big batch
             predicted = output.max(dim=1)[1]  # max returns max_value, max_id
             inputs += [predicted]
             sample_ids += [predicted]
