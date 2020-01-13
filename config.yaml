@@ -25,14 +25,14 @@ tau: 0.5
 #tau: 1.0
 gama1: 0.0
 #gama1: 0.5
-gama2: 0.0
 #gama_kld: 0.0
 gama_kld: 0.05
 #gama_select: 0.0
 gama_select: 0.4
-n_z: 256
 gama_rank: 1.0
 gama_reg: 1.0
+n_z: 64
+#n_user:
 
 # optimize
 epoch: 40

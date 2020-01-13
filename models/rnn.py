@@ -210,7 +210,7 @@ class rnn_topic_decoder(nn.Module):
         else:
             activation = None
 
-        self.attention = models.global_attention_with_topic(config.decoder_hidden_size, activation)
+        self.attention = models.global_attention_with_topic(config.decoder_hidden_size, config.n_z, activation)
         # self.attention = models.global_attention(config.decoder_hidden_size, activation)
         self.hidden_size = config.decoder_hidden_size
         self.dropout = nn.Dropout(config.dropout)

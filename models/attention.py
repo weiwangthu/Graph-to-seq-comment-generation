@@ -49,10 +49,10 @@ class global_attention(nn.Module):
 
 class global_attention_with_topic(nn.Module):
 
-    def __init__(self, hidden_size, activation=None):
+    def __init__(self, hidden_size, topic_size, activation=None):
         super(global_attention_with_topic, self).__init__()
         self.linear_in = nn.Linear(hidden_size, hidden_size)
-        self.linear_out = nn.Linear(3 * hidden_size, hidden_size)
+        self.linear_out = nn.Linear(2 * hidden_size + topic_size, hidden_size)
         self.softmax = nn.Softmax(-1)
         self.tanh = nn.Tanh()
         self.activation = activation
