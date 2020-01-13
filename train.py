@@ -36,7 +36,8 @@ def parse_args():
     parser.add_argument('-model', default='graph2seq', type=str,
                         choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq',
                                  'select2seq', 'select_var_diverse2seq',
-                                 'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq'])
+                                 'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq',
+                                 'select2seq_test'])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
     parser.add_argument('-use_copy', default=False, action="store_true",
@@ -314,6 +315,8 @@ def main():
         model = var_select_var_diverse2seq(config, vocab, use_cuda)
     elif args.model == 'var_select_var_user_diverse2seq':
         model = var_select_var_user_diverse2seq(config, vocab, use_cuda)
+    elif args.model == 'select2seq_test':
+        model = select2seq_test(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
