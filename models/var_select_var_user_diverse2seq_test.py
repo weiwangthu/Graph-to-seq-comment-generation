@@ -136,7 +136,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
 
         # selector vae
         org_post_context_gates = self.select_post_gate(contexts, comment_rep)
-        post_context_gates = gumbel_softmax(torch.log(org_post_context_gates), self.config.tau)
+        post_context_gates = gumbel_softmax(torch.log(org_post_context_gates + 1e-10), self.config.tau)
         post_context_gates = post_context_gates[:, :, 0]  # bsz * n_context
         org_post_context_gates = org_post_context_gates[:, :, 0]
 

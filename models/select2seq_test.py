@@ -75,7 +75,7 @@ class select2seq_test(nn.Module):
 
         # select important information of body
         context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
-        context_gates = gumbel_softmax(torch.log(context_gates), self.config.tau)
+        context_gates = gumbel_softmax(torch.log(context_gates + 1e-10), self.config.tau)
         context_gates = context_gates[:, :, 0]  # bsz * n_context
         # contexts = contexts * gates
 
