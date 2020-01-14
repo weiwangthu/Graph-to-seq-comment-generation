@@ -11,6 +11,7 @@ import collections
 import torch
 import torch.nn as nn
 from tqdm import tqdm
+from torch import autograd
 
 import lr_scheduler as L
 import util
@@ -37,7 +38,8 @@ def parse_args():
                         choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq',
                                  'select2seq', 'select_var_diverse2seq',
                                  'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq',
-                                 'select2seq_test', 'var_select_var_user_diverse2seq_test'])
+                                 'select2seq_test', 'var_select_var_user_diverse2seq_test',
+                                 'var_select_var_user_diverse2seq_test2'])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
     parser.add_argument('-use_copy', default=False, action="store_true",
@@ -118,34 +120,35 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
         model.train()
 
         for batch in tqdm(train_data, disable=not args.verbose):
-            model.zero_grad()
-            outputs = model(batch, use_cuda)
-            target = batch.tgt
-            if use_cuda:
-                target = target.cuda()
-            if isinstance(outputs, dict):
-                result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
-                loss = result['loss']
-                acc = result['acc']
+            with autograd.detect_anomaly():
+                model.zero_grad()
+                outputs = model(batch, use_cuda)
+                target = batch.tgt
+                if use_cuda:
+                    target = target.cuda()
+                if isinstance(outputs, dict):
+                    result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+                    loss = result['loss']
+                    acc = result['acc']
 
-                # get other loss information
-                for k, v in result.items():
-                    if k in ['loss', 'acc']:
-                        continue  # these are already logged above
-                    else:
-                        extra_meters[k].update(v.item())
-            else:
-                loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
-            if torch.isnan(loss):
-                raise Exception('nan error')
+                    # get other loss information
+                    for k, v in result.items():
+                        if k in ['loss', 'acc']:
+                            continue  # these are already logged above
+                        else:
+                            extra_meters[k].update(v.item())
+                else:
+                    loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
+                if torch.isnan(loss):
+                    raise Exception('nan error')
 
-            loss.backward()
-            total_loss += loss.data.item()
-            total_acc += acc.data.item()
+                loss.backward()
+                total_loss += loss.data.item()
+                total_acc += acc.data.item()
 
-            optim.step()
-            updates += 1
-            local_updates += 1
+                optim.step()
+                updates += 1
+                local_updates += 1
 
             if updates % config.print_interval == 0 or args.debug:
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
@@ -318,6 +321,8 @@ def main():
     elif args.model == 'select2seq_test':
         model = select2seq_test(config, vocab, use_cuda)
     elif args.model == 'var_select_var_user_diverse2seq_test':
+        model = var_select_var_user_diverse2seq_test(config, vocab, use_cuda)
+    elif args.model == 'var_select_var_user_diverse2seq_test2':
         model = var_select_var_user_diverse2seq_test(config, vocab, use_cuda)
 
     # total number of parameters
