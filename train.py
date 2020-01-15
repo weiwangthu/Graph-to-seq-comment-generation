@@ -120,35 +120,35 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
         model.train()
 
         for batch in tqdm(train_data, disable=not args.verbose):
-            with autograd.detect_anomaly():
-                model.zero_grad()
-                outputs = model(batch, use_cuda)
-                target = batch.tgt
-                if use_cuda:
-                    target = target.cuda()
-                if isinstance(outputs, dict):
-                    result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
-                    loss = result['loss']
-                    acc = result['acc']
+            # with autograd.detect_anomaly():
+            model.zero_grad()
+            outputs = model(batch, use_cuda)
+            target = batch.tgt
+            if use_cuda:
+                target = target.cuda()
+            if isinstance(outputs, dict):
+                result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+                loss = result['loss']
+                acc = result['acc']
 
-                    # get other loss information
-                    for k, v in result.items():
-                        if k in ['loss', 'acc']:
-                            continue  # these are already logged above
-                        else:
-                            extra_meters[k].update(v.item())
-                else:
-                    loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
-                if torch.isnan(loss):
-                    raise Exception('nan error')
+                # get other loss information
+                for k, v in result.items():
+                    if k in ['loss', 'acc']:
+                        continue  # these are already logged above
+                    else:
+                        extra_meters[k].update(v.item())
+            else:
+                loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
+            if torch.isnan(loss):
+                raise Exception('nan error')
 
-                loss.backward()
-                total_loss += loss.data.item()
-                total_acc += acc.data.item()
+            loss.backward()
+            total_loss += loss.data.item()
+            total_acc += acc.data.item()
 
-                optim.step()
-                updates += 1
-                local_updates += 1
+            optim.step()
+            updates += 1
+            local_updates += 1
 
             if updates % config.print_interval == 0 or args.debug:
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
@@ -286,6 +286,7 @@ def main():
     torch.manual_seed(args.seed)
     if use_cuda:
         torch.cuda.manual_seed(args.seed)
+    # autograd.set_detect_anomaly(True)
 
     vocab = Vocab(config.vocab_file, config.vocab_size)
 
