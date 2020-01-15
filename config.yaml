@@ -48,7 +48,7 @@ schedule: True
 start_decay_at: 2
 
 # log
-log: './log/'
+log_dir: './log/'
 print_interval: 1000
 eval_interval: 10000
 save_interval: 10000

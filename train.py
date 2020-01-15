@@ -67,8 +67,30 @@ def parse_args():
     parser.add_argument('-debug', default=False, action="store_true",
                         help='whether to use debug mode')
 
+    group = parser.add_argument_group('Hyperparameter')
+    group.add_argument('-tau', type=float, default=0.5, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama1', type=float, default=0.0, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_kld', type=float, default=0.05, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_select', type=float, default=0.0, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_rank', type=float, default=1.0, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_reg', type=float, default=1.0, metavar='N',
+                       help='save a checkpoint every N epochs')
+
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
+
+    # overwrite config file
+    d = vars(opt)
+    for k,v in d.items():
+        if k in config:
+            print('overwirte: ', k, v)
+            config[k] = v
+
     return opt, config
 
 
@@ -83,12 +105,12 @@ def set_up_logging():
     # log为记录文件
     # config.log是记录的文件夹, 最后一定是/
     # opt.log是此次运行时记录的文件夹的名字
-    if not os.path.exists(config.log):
-        os.mkdir(config.log)
+    if not os.path.exists(config.log_dir):
+        os.mkdir(config.log_dir)
     if args.log == '':
-        log_path = config.log + utils.format_time(time.localtime()) + '/'
+        log_path = config.log_dir + utils.format_time(time.localtime()) + '/'
     else:
-        log_path = config.log + args.log + '/'
+        log_path = config.log_dir + args.log + '/'
     if not os.path.exists(log_path):
         os.mkdir(log_path)
     logging = utils.logging(log_path + 'log.txt')  # 往这个文件里写记录
@@ -218,7 +240,7 @@ def eval_bleu(model, vocab, valid_data, epoch, updates):
         source += [example for example in batch.examples]
         # reference += [example.ori_target for example in batch.examples]
         multi_ref += [example.ori_targets for example in batch.examples]
-    utils.write_result_to_file(source, candidate, log_path)
+    utils.write_result_to_file(source, candidate, log_path, epoch)
     # text_result, bleu = utils.eval_bleu(reference, candidate, log_path)
     text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate, log_path)
     logging_csv([epoch, updates, text_result])
