@@ -137,12 +137,12 @@ def eval_bleu(reference, candidate, log_path):
     return result, bleu
 
 
-def write_result_to_file(examples, candidates, log_path):
+def write_result_to_file(examples, candidates, log_path, epoch):
     assert len(examples) == len(candidates), (len(examples), len(candidates))
     if not os.path.exists(log_path):
         os.mkdir(log_path)
     log_path = log_path.strip('/')
-    log_file = log_path + '/observe_result.tsv'
+    log_file = log_path + '/observe_result.tsv.%d' % epoch
     with codecs.open(log_file, 'w', 'utf-8') as f:
         for e, cand in zip(examples, candidates):
             f.write("".join(cand).strip() + '\t')
@@ -151,7 +151,7 @@ def write_result_to_file(examples, candidates, log_path):
             f.write("".join(e.ori_original_content).strip() + '\t')
             # f.write("$$".join(["".join(comment).strip() for comment in e.ori_targets]) + '\t')
             f.write("\n")
-    log_file = log_path + '/result_for_test.tsv'
+    log_file = log_path + '/result_for_test.tsv.%d' % epoch
     with codecs.open(log_file, 'w', 'utf-8') as f:
         for e, cand in zip(examples, candidates):
             f.write(str(e.ori_news_id) + '\t')
