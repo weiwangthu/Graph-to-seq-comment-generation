@@ -65,7 +65,7 @@ class hierarchical_attention(nn.Module):
         self.tanh = nn.Tanh()
         self.config = config
         self.criterion = models.criterion(self.vocab_size, use_cuda)
-        self.log_softmax = nn.LogSoftmax()
+        self.log_softmax = nn.LogSoftmax(-1)
 
     def compute_loss(self, hidden_outputs, targets):
         assert hidden_outputs.size(1) == targets.size(1) and hidden_outputs.size(0) == targets.size(0)
@@ -139,73 +139,65 @@ class hierarchical_attention(nn.Module):
 
     # TODO: fix beam search
     def beam_sample(self, batch, use_cuda, beam_size=1):
-        src, adjs, concept, concept_mask = batch.src, batch.adj, batch.concept, batch.concept_mask
-        src_mask = batch.src_mask
-        concept_vocab = batch.concept_vocab
-        title_index = batch.title_index
+        # (1) Run the encoder on the src. Done!!!!
+        src, src_mask, src_len = batch.sentence_content, batch.sentence_content_mask, batch.sentence_content_len
+        sent_mask = batch.sentence_mask
         if use_cuda:
             src = [s.cuda() for s in src]
             src_mask = [s.cuda() for s in src_mask]
-            adjs = [adj.cuda() for adj in adjs]
-            concept = [c.cuda() for c in concept]
-            concept_mask = concept_mask.cuda()
-            title_index = title_index.cuda()
-        # beam_size = self.config.beam_size
-        batch_size = len(src)
+            src_len = src_len.cuda()
+            sent_mask = sent_mask.cuda()
+        contexts, enc_state = self.encode(src, src_mask, src_len, sent_mask)
+        enc_state = self.build_init_state(enc_state, self.config.num_layers)
 
-        # (1) Run the encoder on the src. Done!!!!
-        contexts, state = self.encode(src, src_mask, concept, concept_mask, title_index, adjs)
-        c0, h0 = self.build_init_state(state, self.config.num_layers)
+        batch_size = contexts.size(0)
+        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
+                for _ in range(batch_size)]
 
+        #  (1b) Initialize for the decoder.
         def rvar(a):
             return a.repeat(1, beam_size, 1)
-
-        def bottle(m):
-            return m.view(batch_size * beam_size, -1)
 
         def unbottle(m):
             return m.view(beam_size, batch_size, -1)
 
         # Repeat everything beam_size times.
+        # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
-        concept_mask = concept_mask.repeat(beam_size, 1)
-        concept_vocab = concept_vocab.repeat(beam_size, 1)
-        title_index = title_index.repeat(beam_size)
-        decState = (c0.repeat(1, beam_size, 1), h0.repeat(1, beam_size, 1))
-        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
-                for _ in range(batch_size)]
+        # (batch, seq) -> (beam*batch, seq)
+        # src_mask = src_mask.repeat(beam_size, 1)
+        # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
+        # assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
+        dec_state = (rvar(enc_state[0]), rvar(enc_state[1]))  # layer, beam*batch, nh
+        # decState.repeat_beam_size_times(beam_size)
 
         # (2) run the decoder to generate sentences, using beam search.
-
         for i in range(self.config.max_tgt_len):
 
             if all((b.done() for b in beam)):
                 break
 
-            # Construct batch x beam_size nxt words.
+            # Construct beam*batch  nxt words.
             # Get all the pending current beam words and arrange for forward.
-            inp = torch.stack([b.getCurrentState() for b in beam]).t().contiguous().view(-1)
+            # beam is batch_sized, so stack on dimension 1 not 0
+            inp = torch.stack([b.getCurrentState() for b in beam], 1).contiguous().view(-1)
+            if use_cuda:
+                inp = inp.cuda()
 
             # Run one step.
-            if self.use_copy:
-                output, decState, attn, p_gen = self.decoder.sample_one(inp, decState, contexts, concept_mask,
-                                                                        title_index,
-                                                                        max_oov=0, extend_vocab=concept_vocab)
-            else:
-                output, decState, attn = self.decoder.sample_one(inp, decState, contexts)
-                output = F.softmax(output, -1)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
-            output = unbottle(torch.log(output))
+            output = unbottle(self.log_softmax(output))
             attn = unbottle(attn)
             # beam x tgt_vocab
 
             # (c) Advance each beam.
             # update state
-            for j, b in enumerate(beam):
-                b.advance(output.data[:, j], attn.data[:, j])
-                b.beam_update(decState, j)
+            for j, b in enumerate(beam):  # there are batch size beams!!! so here enumerate over batch
+                b.advance(output.data[:, j], attn.data[:, j])  # output is beam first
+                b.beam_update(dec_state, j)
 
         # (3) Package everything up.
         allHyps, allScores, allAttn = [], [], []
@@ -219,8 +211,9 @@ class hierarchical_attention(nn.Module):
                 hyp, att = b.getHyp(times, k)
                 hyps.append(hyp)
                 attn.append(att.max(1)[1])
-            allAttn.append(attn[0])
             allHyps.append(hyps[0])
+            allScores.append(scores[0])
+            allAttn.append(attn[0])
 
         # print(allHyps)
         # print(allAttn)

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import models
 from Data import *
+from util.misc_utils import move_to_cuda
 
 import numpy as np
 
@@ -35,7 +36,7 @@ class select2seq(nn.Module):
         self.config = config
         self.use_content = use_content
         self.criterion = models.criterion(self.vocab_size, use_cuda)
-        self.log_softmax = nn.LogSoftmax()
+        self.log_softmax = nn.LogSoftmax(-1)
         self.tanh = nn.Tanh()
 
         # select gate
@@ -57,14 +58,10 @@ class select2seq(nn.Module):
             'gate_loss': gate_loss,
         }
 
-    def forward(self, batch, use_cuda):
+    def encode(self, batch, is_test=False):
         src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
         # content, content_len, content_mask = batch.content, batch.cotent_len, batch.cotent_mask
         content, content_len, content_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
-        tgt, tgt_len = batch.tgt, batch.tgt_len
-        if use_cuda:
-            src, src_len, tgt, tgt_len, src_mask = src.cuda(), src_len.cuda(), tgt.cuda(), tgt_len.cuda(), src_mask.cuda()
-            content, content_len, content_mask = content.cuda(), content_len.cuda(), content_mask.cuda()
 
         # input: title, content
         title_contexts, title_state = self.title_encoder(src, src_len)
@@ -75,9 +72,19 @@ class select2seq(nn.Module):
 
         # select important information of body
         context_gates = self.select_gate(contexts, title_rep)  # output: bsz * n_context * 2
+        # if not is_test:
         context_gates = gumbel_softmax(torch.log(context_gates), self.config.tau)
         context_gates = context_gates[:, :, 0]  # bsz * n_context
         # contexts = contexts * gates
+        return contexts, state, context_gates
+
+    def forward(self, batch, use_cuda):
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        contexts, state, context_gates = self.encode(batch)
+
+        content_len, content_mask = batch.title_content_len, batch.title_content_mask
+        tgt, tgt_len = batch.tgt, batch.tgt_len
 
         # decoder
         outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, context_gates)
@@ -90,33 +97,26 @@ class select2seq(nn.Module):
         }
 
     def sample(self, batch, use_cuda):
-        if self.use_content:
-            src, src_len, src_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
-        else:
-            src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
         if use_cuda:
-            src, src_len, src_mask = src.cuda(), src_len.cuda(), src_mask.cuda()
-        bos = torch.ones(src.size(0)).long().fill_(self.vocab.word2id('[START]'))
-        bos = bos.to(src.device)
+            batch = move_to_cuda(batch)
+        contexts, state, context_gates = self.encode(batch, True)
 
-        contexts, state = self.encoder(src, src_len)
-        sample_ids, final_outputs = self.decoder.sample([bos], state, contexts)
+        bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
+        bos = bos.to(contexts.device)
+        sample_ids, final_outputs = self.decoder.sample([bos], state, contexts, context_gates)
 
         return sample_ids, final_outputs[1]
 
     # TODO: fix beam search
     def beam_sample(self, batch, use_cuda, beam_size=1):
-        if self.use_title:
-            src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
-        else:
-            src, src_len, src_mask = batch.ori_content, batch.ori_content_len, batch.ori_content_mask
-        if use_cuda:
-            src, src_len, src_mask = src.cuda(), src_len.cuda(), src_mask.cuda()
-        # beam_size = self.config.beam_size
-        batch_size = src.size(0)
-
         # (1) Run the encoder on the src. Done!!!!
-        contexts, encState = self.encoder(src, src_len)
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        contexts, enc_state, context_gates = self.encode(batch, True)
+
+        batch_size = contexts.size(0)
+        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
+                for _ in range(batch_size)]
 
         #  (1b) Initialize for the decoder.
         def rvar(a):
@@ -128,17 +128,15 @@ class select2seq(nn.Module):
         # Repeat everything beam_size times.
         # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
+        context_gates = context_gates.repeat(beam_size, 1)
         # (batch, seq) -> (beam*batch, seq)
-        src_mask = src_mask.repeat(beam_size, 1)
-        assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
-        assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
-        decState = (rvar(encState[0]), rvar(encState[1]))  # layer, beam*batch, nh
+        # src_mask = src_mask.repeat(beam_size, 1)
+        # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
+        # assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
+        dec_state = (rvar(enc_state[0]), rvar(enc_state[1]))  # layer, beam*batch, nh
         # decState.repeat_beam_size_times(beam_size)
-        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
-                for _ in range(batch_size)]
 
         # (2) run the decoder to generate sentences, using beam search.
-
         for i in range(self.config.max_tgt_len):
 
             if all((b.done() for b in beam)):
@@ -152,11 +150,11 @@ class select2seq(nn.Module):
                 inp = inp.cuda()
 
             # Run one step.
-            output, decState, attn = self.decoder.sample_one(inp, decState, contexts, src_mask)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, context_gates)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
-            output = unbottle(self.log_softmax(output, -1))
+            output = unbottle(self.log_softmax(output))
             attn = unbottle(attn)
             # beam x tgt_vocab
 
@@ -164,7 +162,7 @@ class select2seq(nn.Module):
             # update state
             for j, b in enumerate(beam):  # there are batch size beams!!! so here enumerate over batch
                 b.advance(output.data[:, j], attn.data[:, j])  # output is beam first
-                b.beam_update(decState, j)
+                b.beam_update(dec_state, j)
 
         # (3) Package everything up.
         allHyps, allScores, allAttn = [], [], []
