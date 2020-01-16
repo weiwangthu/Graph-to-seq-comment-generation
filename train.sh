@@ -105,6 +105,9 @@ CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
   -model var_select_var_user_diverse2seq_test -log 5c_var_select_var_user_diverse2seq_test_tau0.5_gama0_kld0.05_sel0_r1_re0.01 \
   -tau 0.5 -gama1 0.0 -gama_kld 0.05 -gama_select 0.0 -gama_rank 1.0 -gama_reg 0.01 -restore checkpoint_last.pt
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model var_select_var_user_diverse2seq_test -log 5c_var_select_var_user_diverse2seq_test_tau0.5_gama0_kld0.05_sel0_r1_re0.01_test \
+  -tau 0.5 -gama1 0.0 -gama_kld 0.05 -gama_select 0.0 -gama_rank 1.0 -gama_reg 0.01
 
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
   -model var_select_var_user_diverse2seq_test2 -log 5c_var_select_var_user_diverse2seq_test2_tau0.5_gama0_kld0.05_sel0_r1_re0.01 \

@@ -50,10 +50,10 @@ class GetUser(nn.Module):
             h_user = self.use_emb(ids)
         return h_user
 
-class var_select_var_user_diverse2seq_test(nn.Module):
+class var_select_var_user_diverse2seq_test3(nn.Module):
 
     def __init__(self, config, vocab, use_cuda, use_content=False, pretrain=None):
-        super(var_select_var_user_diverse2seq_test, self).__init__()
+        super(var_select_var_user_diverse2seq_test3, self).__init__()
         self.vocab = vocab
         self.vocab_size = vocab.voc_size
         if pretrain is not None:
@@ -151,40 +151,43 @@ class var_select_var_user_diverse2seq_test(nn.Module):
             kld_select = (kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum() / content_mask.nonzero().size(0)
 
             # comment vae
-            mu = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
+            # mu = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
             logvar = self.hidden_to_logvar(comment_rep)  # Get log variance of latent z
+
+            # get user
+            mu = self.get_user(comment_rep, is_test)
+            mu_neg = torch.roll(mu, 1, dims=0)
 
             z = torch.randn([comment_rep.size(0), self.config.n_z]).to(mu.device)  # Noise sampled from Normal(0,1)
             z = mu + z * torch.exp(0.5 * logvar)  # Reparameterization trick
             kld = -0.5 * torch.sum(logvar - mu.pow(2) - logvar.exp() + 1, 1).mean()  # Compute KL divergence loss
         else:
             comment_rep = None
+            mu = None
+            mu_neg = None
             z = torch.randn([contexts.size(0), self.config.n_z]).to(contexts.device)
             kld = 0.0
             kld_select = 0.0
 
             post_context_gates = context_gates
 
-        return contexts, state, post_context_gates, z, kld, comment_rep, kld_select
+        return contexts, state, post_context_gates, z, kld, comment_rep, kld_select, mu, mu_neg
 
     def forward(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, post_context_gates, z, kld, comment_rep, kld_select = self.encode(batch)
+        contexts, state, post_context_gates, z, kld, comment_rep, kld_select, mu, mu_neg = self.encode(batch)
 
         content_len, content_mask = batch.title_content_len, batch.title_content_mask
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
-        # get user
-        h_user = self.get_user(z)
-        h_user_neg = torch.roll(h_user, 1, dims=0)
         # user loss
-        rank_loss = (1 - torch.sum(h_user*z, dim=-1) + torch.sum(h_user_neg*z, dim=-1)).clamp(min=0).mean()
-        reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=h_user.dtype, device=h_user.device)
+        rank_loss = (1 - torch.sum(mu*comment_rep, dim=-1) + torch.sum(mu_neg*comment_rep, dim=-1)).clamp(min=0).mean()
+        reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=mu.dtype, device=mu.device)
         reg_loss = torch.norm(reg_loss, 2, dim=-1).mean()
 
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, h_user)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, z)
         # return outputs, gates, title_state[0], comment_state[0]
 
         l1_gates = (post_context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
@@ -201,12 +204,11 @@ class var_select_var_user_diverse2seq_test(nn.Module):
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, context_gates, z, _, _, _ = self.encode(batch, True)
-        h_user = self.get_user(z, True)
+        contexts, state, context_gates, z, _, _, _, _, _ = self.encode(batch, True)
 
         bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
         bos = bos.to(contexts.device)
-        sample_ids, final_outputs = self.decoder.sample([bos], state, contexts, context_gates, h_user)
+        sample_ids, final_outputs = self.decoder.sample([bos], state, contexts, context_gates, z)
 
         return sample_ids, final_outputs[1]
 
@@ -215,8 +217,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, context_gates, z, _, _, _ = self.encode(batch, True)
-        h_user = self.get_user(z, True)
+        contexts, enc_state, context_gates, z, _, _, _, _, _ = self.encode(batch, True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
@@ -233,7 +234,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
         context_gates = context_gates.repeat(beam_size, 1)
-        h_user = h_user.repeat(beam_size, 1)
+        z = z.repeat(beam_size, 1)
         # (batch, seq) -> (beam*batch, seq)
         # src_mask = src_mask.repeat(beam_size, 1)
         # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
@@ -255,7 +256,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
                 inp = inp.cuda()
 
             # Run one step.
-            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, context_gates, h_user)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, context_gates, z)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
@@ -288,7 +289,6 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         # print(allHyps)
         # print(allAttn)
         return allHyps, allAttn
-
 
 def sample_gumbel(shape, eps=1e-20):
     U = torch.rand(shape)

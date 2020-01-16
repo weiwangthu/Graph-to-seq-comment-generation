@@ -39,7 +39,7 @@ def parse_args():
                                  'select2seq', 'select_var_diverse2seq',
                                  'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq',
                                  'select2seq_test', 'var_select_var_user_diverse2seq_test',
-                                 'var_select_var_user_diverse2seq_test2'])
+                                 'var_select_var_user_diverse2seq_test2', 'var_select_var_user_diverse2seq_test3'])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
     parser.add_argument('-use_copy', default=False, action="store_true",
@@ -346,7 +346,9 @@ def main():
     elif args.model == 'var_select_var_user_diverse2seq_test':
         model = var_select_var_user_diverse2seq_test(config, vocab, use_cuda)
     elif args.model == 'var_select_var_user_diverse2seq_test2':
-        model = var_select_var_user_diverse2seq_test(config, vocab, use_cuda)
+        model = var_select_var_user_diverse2seq_test2(config, vocab, use_cuda)
+    elif args.model == 'var_select_var_user_diverse2seq_test3':
+        model = var_select_var_user_diverse2seq_test3(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
