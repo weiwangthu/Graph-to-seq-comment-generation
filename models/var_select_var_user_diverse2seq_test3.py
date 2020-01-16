@@ -13,11 +13,12 @@ class SelectGate(nn.Module):
 
     def __init__(self, config):
         super(SelectGate, self).__init__()
-        self.linear1 = nn.Linear(config.encoder_hidden_size * 2, config.encoder_hidden_size)
+        self.linear1 = nn.Linear(config.encoder_hidden_size * 2 + config.n_z, config.encoder_hidden_size)
         self.linear2 = nn.Linear(config.encoder_hidden_size, 2)
 
-    def forward(self, contexts):
-        gates = F.softmax(self.linear2(F.relu((self.linear1(contexts)))), dim=-1)
+    def forward(self, contexts, z):
+        z = z.unsqueeze(1).expand(-1, contexts.size(1), -1)
+        gates = F.softmax(self.linear2(F.relu((self.linear1(torch.cat([contexts, z], dim=-1))))), dim=-1)
         return gates
 
 
@@ -25,12 +26,13 @@ class PostSelectGate(nn.Module):
 
     def __init__(self, config):
         super(PostSelectGate, self).__init__()
-        self.linear1 = nn.Linear(config.encoder_hidden_size * 4, config.encoder_hidden_size)
+        self.linear1 = nn.Linear(config.encoder_hidden_size * 4 + config.n_z, config.encoder_hidden_size)
         self.linear2 = nn.Linear(config.encoder_hidden_size, 2)
 
-    def forward(self, contexts, comment_context):
+    def forward(self, contexts, z, comment_context):
+        z = z.unsqueeze(1).expand(-1, contexts.size(1), -1)
         comment_context = comment_context.unsqueeze(1).expand(-1, contexts.size(1), -1)
-        gates = F.softmax(self.linear2(F.relu(self.linear1(torch.cat([contexts, comment_context], dim=-1)))), dim=-1)
+        gates = F.softmax(self.linear2(F.relu(self.linear1(torch.cat([contexts, z, comment_context], dim=-1)))), dim=-1)
         return gates
 
 
@@ -127,28 +129,11 @@ class var_select_var_user_diverse2seq_test3(nn.Module):
         # encoder
         contexts, state = self.encoder(content, content_len)
 
-        # select important information of body
-        context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
-        context_gates = context_gates[:, :, 0]  # bsz * n_context
-
         if not is_test:
             # comment encoder
             tgt, tgt_len = batch.tgt, batch.tgt_len
             _, comment_state = self.comment_encoder(tgt, tgt_len)  # output: bsz * n_hidden
             comment_rep = comment_state[0][-1]  # bsz * n_hidden
-
-            # selector vae
-            org_post_context_gates = self.select_post_gate(contexts, comment_rep)
-            post_context_gates = gumbel_softmax(torch.log(org_post_context_gates + 1e-10), self.config.tau)
-            post_context_gates = post_context_gates[:, :, 0]  # bsz * n_context
-            org_post_context_gates = org_post_context_gates[:, :, 0]
-
-            # kl(p1||p2)
-            def kldiv(p1, p2):
-                kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
-                return kl
-
-            kld_select = (kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum() / content_mask.nonzero().size(0)
 
             # comment vae
             # mu = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
@@ -161,13 +146,35 @@ class var_select_var_user_diverse2seq_test3(nn.Module):
             z = torch.randn([comment_rep.size(0), self.config.n_z]).to(mu.device)  # Noise sampled from Normal(0,1)
             z = mu + z * torch.exp(0.5 * logvar)  # Reparameterization trick
             kld = -0.5 * torch.sum(logvar - mu.pow(2) - logvar.exp() + 1, 1).mean()  # Compute KL divergence loss
+
+            # select important information of body
+            context_gates = self.select_gate(contexts, z)  # output: bsz * n_context * 2
+            context_gates = context_gates[:, :, 0]  # bsz * n_context
+
+            # selector vae
+            org_post_context_gates = self.select_post_gate(contexts, z, comment_rep)
+            post_context_gates = gumbel_softmax(torch.log(org_post_context_gates + 1e-10), self.config.tau)
+            post_context_gates = post_context_gates[:, :, 0]  # bsz * n_context
+            org_post_context_gates = org_post_context_gates[:, :, 0]
+
+            # kl(p1||p2)
+            def kldiv(p1, p2):
+                kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
+                return kl
+
+            kld_select = (kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum() / content_mask.nonzero().size(0)
         else:
             comment_rep = None
-            mu = None
+            mu = self.get_user(None, is_test)
             mu_neg = None
             z = torch.randn([contexts.size(0), self.config.n_z]).to(contexts.device)
+            z = z + mu
             kld = 0.0
             kld_select = 0.0
+
+            # select important information of body
+            context_gates = self.select_gate(contexts, z)  # output: bsz * n_context * 2
+            context_gates = context_gates[:, :, 0]  # bsz * n_context
 
             post_context_gates = context_gates
 

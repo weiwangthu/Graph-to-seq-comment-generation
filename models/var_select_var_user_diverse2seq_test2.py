@@ -38,7 +38,7 @@ class GetUser(nn.Module):
 
     def __init__(self, config):
         super(GetUser, self).__init__()
-        self.linear = nn.Linear(config.n_z, 10)
+        self.linear = nn.Linear(config.encoder_hidden_size * 2, 10)
         self.use_emb = nn.Embedding(10, config.n_z)
 
     def forward(self, latent_context, is_test=False):

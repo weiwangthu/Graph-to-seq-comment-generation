@@ -68,6 +68,8 @@ def parse_args():
                         help='whether to use debug mode')
 
     group = parser.add_argument_group('Hyperparameter')
+    group.add_argument('-n_z', type=int, default=64, metavar='N',
+                       help='save a checkpoint every N epochs')
     group.add_argument('-tau', type=float, default=0.5, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama1', type=float, default=0.0, metavar='N',
