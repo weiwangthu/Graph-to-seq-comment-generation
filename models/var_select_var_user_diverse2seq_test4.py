@@ -165,7 +165,7 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
             kld_select = (kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum() / content_mask.nonzero().size(0)
         else:
             comment_rep = None
-            mu = self.get_user(None, is_test)
+            mu = self.get_user(contexts, is_test)
             mu_neg = None
             z = torch.randn([contexts.size(0), self.config.n_z]).to(contexts.device)
             z = z + mu

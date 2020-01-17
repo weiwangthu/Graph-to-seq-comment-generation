@@ -163,9 +163,10 @@ class var_select_var_user_diverse2seq_test2(nn.Module):
             kld = -0.5 * torch.sum(logvar - mu.pow(2) - logvar.exp() + 1, 1).mean()  # Compute KL divergence loss
         else:
             comment_rep = None
-            mu = None
+            mu = self.get_user(contexts, is_test)
             mu_neg = None
             z = torch.randn([contexts.size(0), self.config.n_z]).to(contexts.device)
+            z = z + mu
             kld = 0.0
             kld_select = 0.0
 
