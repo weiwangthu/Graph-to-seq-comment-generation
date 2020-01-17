@@ -159,6 +159,48 @@ def write_result_to_file(examples, candidates, log_path, epoch):
             f.write("\n")
 
 
+def write_topic_result_to_file(examples, candidates, log_path, epoch, topic):
+    assert len(examples) == len(candidates), (len(examples), len(candidates))
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+    log_path = log_path.strip('/')
+    log_file = log_path + '/result_for_test.tsv.%d.%d' % (epoch, topic)
+    with codecs.open(log_file, 'w', 'utf-8') as f:
+        for e, cand in zip(examples, candidates):
+            f.write(str(e.ori_news_id) + '\t')
+            f.write(" ".join(cand).strip())
+            f.write("\n")
+
+def write_observe_to_file(examples, candidates, log_path, epoch):
+    assert len(examples) == len(candidates), (len(examples), len(candidates))
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+    log_path = log_path.strip('/')
+    log_file = log_path + '/observe_result.tsv.all.%d' % epoch
+    with codecs.open(log_file, 'w', 'utf-8') as f:
+        for e, cand in zip(examples, candidates):
+            cand_str = list(map(lambda com: ''.join(com).strip(), cand))
+            f.write(" <sep> ".join(cand_str).strip() + '\t')
+            f.write("".join(e.ori_title).strip() + '\t')
+            # f.write(";".join(["".join(sent).strip() for sent in e.ori_content]) + '\t')
+            f.write("".join(e.ori_original_content).strip() + '\t')
+            # f.write("$$".join(["".join(comment).strip() for comment in e.ori_targets]) + '\t')
+            f.write("\n")
+
+def write_embedding(embedding, log_path, epoch):
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+    log_path = log_path.strip('/')
+    log_file = log_path + '/observe_topic_emb.%d.' % epoch
+    out_v = codecs.open(log_file + 'vecs.tsv', 'w', encoding='utf-8')
+    out_m = codecs.open(log_file + 'meta.tsv', 'w', encoding='utf-8')
+
+    for i in range(len(embedding)):
+        out_m.write(str(i) + "\n")
+        out_v.write('\t'.join([str(x) for x in embedding[i]]) + "\n")
+    out_v.close()
+    out_m.close()
+
 def count_entity_num(candidates, tags):
     assert type(candidates) == list and type(tags) == list
     num = 0.

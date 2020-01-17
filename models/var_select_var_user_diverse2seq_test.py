@@ -40,13 +40,17 @@ class GetUser(nn.Module):
         super(GetUser, self).__init__()
         self.linear = nn.Linear(config.n_z, 10)
         self.use_emb = nn.Embedding(10, config.n_z)
+        self.topic_id = -1
 
     def forward(self, latent_context, is_test=False):
         if not is_test:
             p_user = F.softmax(self.linear(latent_context), dim=-1)  # bsz * 10
             h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
         else:
-            ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, 10)
+            if self.topic_id == -1:
+                ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, 10)
+            else:
+                ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).fill_(self.topic_id)
             h_user = self.use_emb(ids)
         return h_user
 
