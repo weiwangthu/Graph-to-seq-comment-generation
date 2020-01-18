@@ -447,7 +447,7 @@ def main():
         test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug)
         if args.topic:
             utils.write_embedding(model.get_user.use_emb.weight.detach().cpu().numpy(), log_path, epoch)
-            # eval_bleu_with_topic(model, vocab, test_data, epoch, updates)
+            eval_bleu_with_topic(model, vocab, test_data, epoch, updates)
         else:
             eval_bleu(model, vocab, test_data, epoch, updates)
 
