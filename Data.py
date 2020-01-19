@@ -380,6 +380,30 @@ def eval_distinct(cand_file):
     return unigram, bigram, trigram, sentence
 
 
+def calc_diversity(texts):
+    unigram, bigram, trigram, qugram = set(), set(), set(), set()
+    num_tok = 0
+    for vec in texts:
+        v_len = len(vec)
+        num_tok += v_len
+        unigram.update(vec)
+        bigram.update([tuple(vec[i:i+2]) for i in range(v_len-1)])
+        trigram.update([tuple(vec[i:i + 3]) for i in range(v_len - 2)])
+        qugram.update([tuple(vec[i:i + 4]) for i in range(v_len - 3)])
+    metrics = OrderedDict()
+    metrics['d_1'] = round(len(unigram) * 1.0 / num_tok * 100, 6)
+    metrics['d_2'] = round(len(bigram) * 1.0 / num_tok * 100, 6)
+    metrics['d_3'] = round(len(trigram) * 1.0 / num_tok * 100, 6)
+    metrics['d_4'] = round(len(qugram) * 1.0 / num_tok * 100, 6)
+    metrics['num_d1'] = len(unigram)
+    metrics['num_d2'] = len(bigram)
+    metrics['num_d3'] = len(trigram)
+    metrics['num_d4'] = len(qugram)
+    metrics['num_tok'] = num_tok
+    metrics['sen_len'] = round(num_tok * 1.0 / len(texts), 6)
+    return metrics
+
+
 if __name__ == '__main__':
     '''
     print('entertainment')

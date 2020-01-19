@@ -17,7 +17,7 @@ import lr_scheduler as L
 import util
 from optims import Optim
 from util import utils
-from Data import Vocab, DataLoader
+from Data import Vocab, DataLoader, calc_diversity
 from models import *
 
 from util.nlp_utils import *
@@ -59,6 +59,8 @@ def parse_args():
     parser.add_argument('-restore', type=str, default=None,
                         help="restore checkpoint")
     parser.add_argument('-beam_search', default=False, action='store_true',
+                        help="beam_search")
+    parser.add_argument('-n_best', type=int, default=5,
                         help="beam_search")
 
     parser.add_argument('-log', default='', type=str,
@@ -233,7 +235,7 @@ def eval_bleu(model, vocab, valid_data, epoch, updates):
         if len(args.gpus) > 1 or not args.beam_search:
             samples, alignment = model.sample(batch, use_cuda)
         else:
-            samples, alignment = model.beam_sample(batch, use_cuda, beam_size=config.beam_size)
+            samples, alignment = model.beam_sample(batch, use_cuda, beam_size=config.beam_size, n_best=args.n_best)
         '''
         if i == 0:
             print(batch.examples[27].ori_title)
@@ -241,16 +243,29 @@ def eval_bleu(model, vocab, valid_data, epoch, updates):
             print([d for d in alignment.tolist()[27]])
             return
         '''
-        candidate += [vocab.id2sent(s) for s in samples]
+        candidate += [[vocab.id2sent(si) for si in s]for s in samples]
         source += [example for example in batch.examples]
         # reference += [example.ori_target for example in batch.examples]
         multi_ref += [example.ori_targets for example in batch.examples]
-    utils.write_result_to_file(source, candidate, log_path, epoch)
-    # text_result, bleu = utils.eval_bleu(reference, candidate, log_path)
-    text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate, log_path)
+    utils.write_multi_result_to_file(source, candidate, log_path, epoch)
+
+    # bleu, best 1
+    single_candidate = [c[0] for c in candidate]
+    text_result, bleu = utils.eval_multi_bleu(multi_ref, single_candidate, log_path)
     logging_csv([epoch, updates, text_result])
     print(text_result, flush=True)
-    # print(multi_text_result, flush=True)
+
+    # distinct, best 1 and best n
+    metrics_best_1 = calc_diversity(single_candidate)
+    text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_1[key]) for key in metrics_best_1.keys())
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+
+    flatten_candidate = [si for can in candidate for si in can]
+    metrics_best_n = calc_diversity(flatten_candidate)
+    text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_n[key]) for key in metrics_best_n.keys())
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
     return bleu
 
 
@@ -288,6 +303,24 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
         text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate[i], log_path)
         logging_csv([epoch, updates, text_result])
         print(text_result, flush=True)
+
+    # bleu, best 1
+    single_candidate = [c[0] for c in candidate]
+    text_result, bleu = utils.eval_multi_bleu(multi_ref, single_candidate, log_path)
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+
+    # distinct, best 1 and best n
+    metrics_best_1 = calc_diversity(single_candidate)
+    text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_1[key]) for key in metrics_best_1.keys())
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+
+    flatten_candidate = [si for can in candidate for si in can]
+    metrics_best_n = calc_diversity(flatten_candidate)
+    text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_n[key]) for key in metrics_best_n.keys())
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
     candidate = list(zip(*candidate))
     utils.write_observe_to_file(source, candidate, log_path, epoch)
     return bleu

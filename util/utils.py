@@ -159,12 +159,37 @@ def write_result_to_file(examples, candidates, log_path, epoch):
             f.write("\n")
 
 
+def write_multi_result_to_file(examples, candidates, log_path, epoch):
+    assert len(examples) == len(candidates), (len(examples), len(candidates))
+    if not os.path.exists(log_path):
+        os.mkdir(log_path)
+    log_path = log_path.strip('/')
+    log_file = log_path + '/observe_result.tsv.beam.%d' % epoch
+    with codecs.open(log_file, 'w', 'utf-8') as f:
+        for e, cand in zip(examples, candidates):
+            cand_str = list(map(lambda com: ''.join(com).strip(), cand))
+            f.write(" <sep> ".join(cand_str).strip() + '\t')
+            f.write("".join(e.ori_title).strip() + '\t')
+            # f.write(";".join(["".join(sent).strip() for sent in e.ori_content]) + '\t')
+            f.write("".join(e.ori_original_content).strip() + '\t')
+            # f.write("$$".join(["".join(comment).strip() for comment in e.ori_targets]) + '\t')
+            f.write("\n")
+    beam_size = len(candidates[0])
+    log_files = [log_path + '/result_for_test.tsv.beam.%d.%d' % (epoch, i) for i in range(beam_size)]
+    fs = [codecs.open(log, 'w', 'utf-8') for log in log_files]
+    for e, cand in zip(examples, candidates):
+        for ii, f in enumerate(fs):
+            f.write(str(e.ori_news_id) + '\t')
+            f.write(" ".join(cand[ii]).strip())
+            f.write("\n")
+
+
 def write_topic_result_to_file(examples, candidates, log_path, epoch, topic):
     assert len(examples) == len(candidates), (len(examples), len(candidates))
     if not os.path.exists(log_path):
         os.mkdir(log_path)
     log_path = log_path.strip('/')
-    log_file = log_path + '/result_for_test.tsv.%d.%d' % (epoch, topic)
+    log_file = log_path + '/result_for_test.tsv.topic.%d.%d' % (epoch, topic)
     with codecs.open(log_file, 'w', 'utf-8') as f:
         for e, cand in zip(examples, candidates):
             f.write(str(e.ori_news_id) + '\t')
@@ -176,7 +201,7 @@ def write_observe_to_file(examples, candidates, log_path, epoch):
     if not os.path.exists(log_path):
         os.mkdir(log_path)
     log_path = log_path.strip('/')
-    log_file = log_path + '/observe_result.tsv.all.%d' % epoch
+    log_file = log_path + '/observe_result.tsv.topic.%d' % epoch
     with codecs.open(log_file, 'w', 'utf-8') as f:
         for e, cand in zip(examples, candidates):
             cand_str = list(map(lambda com: ''.join(com).strip(), cand))

@@ -138,7 +138,7 @@ class hierarchical_attention(nn.Module):
         return sample_ids, None
 
     # TODO: fix beam search
-    def beam_sample(self, batch, use_cuda, beam_size=1):
+    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
         # (1) Run the encoder on the src. Done!!!!
         src, src_mask, src_len = batch.sentence_content, batch.sentence_content_mask, batch.sentence_content_len
         sent_mask = batch.sentence_mask
@@ -204,16 +204,15 @@ class hierarchical_attention(nn.Module):
 
         for j in range(batch_size):
             b = beam[j]
-            n_best = 1
             scores, ks = b.sortFinished(minimum=n_best)
             hyps, attn = [], []
             for i, (times, k) in enumerate(ks[:n_best]):
                 hyp, att = b.getHyp(times, k)
                 hyps.append(hyp)
                 attn.append(att.max(1)[1])
-            allHyps.append(hyps[0])
-            allScores.append(scores[0])
-            allAttn.append(attn[0])
+            allHyps.append(hyps)
+            allScores.append(scores)
+            allAttn.append(attn)
 
         # print(allHyps)
         # print(allAttn)
