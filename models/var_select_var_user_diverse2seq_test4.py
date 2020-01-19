@@ -119,6 +119,8 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
             'kld_select_loss': kld_select,
             'rank': rank_loss,
             'reg': reg_loss,
+            'pri_gates': out_dict['pri_gates'],
+            'user_norm': out_dict['user_norm'],
         }
 
     def encode(self, batch, is_test=False):
@@ -166,7 +168,7 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
                 kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
                 return kl
 
-            kld_select = (kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum() / content_mask.nonzero().size(0)
+            kld_select = ((kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
         else:
             comment_rep = None
             mu = self.get_user(contexts, is_test)
@@ -182,12 +184,12 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
 
             post_context_gates = context_gates
 
-        return contexts, state, post_context_gates, z, kld, comment_rep, kld_select, mu, mu_neg
+        return contexts, state, post_context_gates, z, kld, comment_rep, kld_select, mu, mu_neg, context_gates
 
     def forward(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, post_context_gates, z, kld, comment_rep, kld_select, mu, mu_neg = self.encode(batch)
+        contexts, state, post_context_gates, z, kld, comment_rep, kld_select, mu, mu_neg, context_gates = self.encode(batch)
         weight = F.softmax(post_context_gates, dim=-1)
         filter_contexts = (contexts * weight.unsqueeze(-1)).sum(dim=1)
         z = torch.cat([z, filter_contexts], dim=-1)
@@ -198,13 +200,15 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
         # user loss
         rank_loss = (1 - torch.sum(mu*comment_rep, dim=-1) + torch.sum(mu_neg*comment_rep, dim=-1)).clamp(min=0).mean()
         reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=mu.dtype, device=mu.device)
-        reg_loss = torch.norm(reg_loss, 2, dim=-1).mean()
+        reg_loss = torch.norm(reg_loss)
 
         # decoder
         outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, None, z)
         # return outputs, gates, title_state[0], comment_state[0]
 
         l1_gates = (post_context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
+        pri_gates = (context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
+        user_norm = torch.norm(self.get_user.use_emb.weight, 2, dim=1).mean()
         return {
             'outputs': outputs,
             'l1_gates': l1_gates.mean(),
@@ -213,12 +217,14 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
             'kld_select': kld_select,
             'rank': rank_loss,
             'reg': reg_loss,
+            'pri_gates': pri_gates.mean(),
+            'user_norm': user_norm,
         }
 
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, context_gates, z, _, _, _, _, _ = self.encode(batch, True)
+        contexts, state, context_gates, z, _, _, _, _, _, _ = self.encode(batch, True)
         weight = F.softmax(context_gates, dim=-1)
         filter_contexts = (contexts * weight.unsqueeze(-1)).sum(dim=1)
         z = torch.cat([z, filter_contexts], dim=-1)
@@ -234,7 +240,7 @@ class var_select_var_user_diverse2seq_test4(nn.Module):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, context_gates, z, _, _, _, _, _ = self.encode(batch, True)
+        contexts, enc_state, context_gates, z, _, _, _, _, _, _ = self.encode(batch, True)
         weight = F.softmax(context_gates, dim=-1)
         filter_contexts = (contexts * weight.unsqueeze(-1)).sum(dim=1)
         z = torch.cat([z, filter_contexts], dim=-1)

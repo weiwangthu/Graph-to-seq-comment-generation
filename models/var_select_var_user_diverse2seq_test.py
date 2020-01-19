@@ -117,6 +117,8 @@ class var_select_var_user_diverse2seq_test(nn.Module):
             'kld_select_loss': kld_select,
             'rank': rank_loss,
             'reg': reg_loss,
+            'pri_gates': out_dict['pri_gates'],
+            'user_norm': out_dict['user_norm'],
         }
 
     def encode(self, batch, is_test=False):
@@ -152,7 +154,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
                 kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
                 return kl
 
-            kld_select = (kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum() / content_mask.nonzero().size(0)
+            kld_select = ((kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
 
             # comment vae
             mu = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
@@ -169,12 +171,12 @@ class var_select_var_user_diverse2seq_test(nn.Module):
 
             post_context_gates = context_gates
 
-        return contexts, state, post_context_gates, z, kld, comment_rep, kld_select
+        return contexts, state, post_context_gates, z, kld, comment_rep, kld_select, context_gates
 
     def forward(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, post_context_gates, z, kld, comment_rep, kld_select = self.encode(batch)
+        contexts, state, post_context_gates, z, kld, comment_rep, kld_select, context_gates = self.encode(batch)
 
         content_len, content_mask = batch.title_content_len, batch.title_content_mask
         tgt, tgt_len = batch.tgt, batch.tgt_len
@@ -185,13 +187,15 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         # user loss
         rank_loss = (1 - torch.sum(h_user*z, dim=-1) + torch.sum(h_user_neg*z, dim=-1)).clamp(min=0).mean()
         reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=h_user.dtype, device=h_user.device)
-        reg_loss = torch.norm(reg_loss, 2, dim=-1).mean()
+        reg_loss = torch.norm(reg_loss)
 
         # decoder
         outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, h_user)
         # return outputs, gates, title_state[0], comment_state[0]
 
         l1_gates = (post_context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
+        pri_gates = (context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
+        user_norm = torch.norm(self.get_user.use_emb.weight, 2, dim=1).mean()
         return {
             'outputs': outputs,
             'l1_gates': l1_gates.mean(),
@@ -200,12 +204,14 @@ class var_select_var_user_diverse2seq_test(nn.Module):
             'kld_select': kld_select,
             'rank': rank_loss,
             'reg': reg_loss,
+            'pri_gates': pri_gates.mean(),
+            'user_norm': user_norm,
         }
 
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, context_gates, z, _, _, _ = self.encode(batch, True)
+        contexts, state, context_gates, z, _, _, _, _ = self.encode(batch, True)
         h_user = self.get_user(z, True)
 
         bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
@@ -215,11 +221,11 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         return sample_ids, final_outputs[1]
 
     # TODO: fix beam search
-    def beam_sample(self, batch, use_cuda, beam_size=1):
+    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, context_gates, z, _, _, _ = self.encode(batch, True)
+        contexts, enc_state, context_gates, z, _, _, _, _ = self.encode(batch, True)
         h_user = self.get_user(z, True)
 
         batch_size = contexts.size(0)
@@ -278,16 +284,16 @@ class var_select_var_user_diverse2seq_test(nn.Module):
 
         for j in range(batch_size):
             b = beam[j]
-            n_best = 1
+            # n_best = 1
             scores, ks = b.sortFinished(minimum=n_best)
             hyps, attn = [], []
             for i, (times, k) in enumerate(ks[:n_best]):
                 hyp, att = b.getHyp(times, k)
                 hyps.append(hyp)
                 attn.append(att.max(1)[1])
-            allHyps.append(hyps[0])
-            allScores.append(scores[0])
-            allAttn.append(attn[0])
+            allHyps.append(hyps)
+            allScores.append(scores)
+            allAttn.append(attn)
 
         # print(allHyps)
         # print(allAttn)
