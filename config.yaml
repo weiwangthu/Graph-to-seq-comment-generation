@@ -32,6 +32,7 @@ gama_select: 0.4
 gama_rank: 1.0
 gama_reg: 1.0
 n_z: 64
+min_select: 0.0
 #n_user:
 
 # optimize

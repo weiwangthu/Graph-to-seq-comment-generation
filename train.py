@@ -69,6 +69,8 @@ def parse_args():
                         help="verbose")
     parser.add_argument('-debug', default=False, action="store_true",
                         help='whether to use debug mode')
+    parser.add_argument('-train_num', type=int, default=0,
+                        help='whether to use debug mode')
 
     group = parser.add_argument_group('Hyperparameter')
     group.add_argument('-n_z', type=int, default=64, metavar='N',
@@ -84,6 +86,8 @@ def parse_args():
     group.add_argument('-gama_rank', type=float, default=1.0, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama_reg', type=float, default=1.0, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-min_select', type=float, default=0.0, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-topic', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
@@ -291,36 +295,34 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
             '''
             # first topic
             if i == 0:
-                candidate[i] += [vocab.id2sent(s) for s in samples]
+                candidate[i] += [vocab.id2sent(s[0]) for s in samples]
                 source += [example for example in batch.examples]
                 # reference += [example.ori_target for example in batch.examples]
                 multi_ref += [example.ori_targets for example in batch.examples]
             else:
-                candidate[i] += [vocab.id2sent(s) for s in samples]
+                candidate[i] += [vocab.id2sent(s[0]) for s in samples]
 
+        # save to file
         utils.write_topic_result_to_file(source, candidate[i], log_path, epoch, i)
-        # text_result, bleu = utils.eval_bleu(reference, candidate, log_path)
-        text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate[i], log_path)
-        logging_csv([epoch, updates, text_result])
-        print(text_result, flush=True)
 
     # bleu, best 1
-    single_candidate = [c[0] for c in candidate]
-    text_result, bleu = utils.eval_multi_bleu(multi_ref, single_candidate, log_path)
+    text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate[0], log_path)
     logging_csv([epoch, updates, text_result])
     print(text_result, flush=True)
 
     # distinct, best 1 and best n
-    metrics_best_1 = calc_diversity(single_candidate)
+    metrics_best_1 = calc_diversity(candidate[0])
     text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_1[key]) for key in metrics_best_1.keys())
     logging_csv([epoch, updates, text_result])
     print(text_result, flush=True)
 
-    flatten_candidate = [si for can in candidate for si in can]
+    flatten_candidate = [si for tt in range(5) for si in candidate[tt]]
     metrics_best_n = calc_diversity(flatten_candidate)
     text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_n[key]) for key in metrics_best_n.keys())
     logging_csv([epoch, updates, text_result])
     print(text_result, flush=True)
+
+    # save to one file
     candidate = list(zip(*candidate))
     utils.write_observe_to_file(source, candidate, log_path, epoch)
     return bleu
@@ -393,8 +395,8 @@ def main():
     use_gnn = False
     if args.graph_model == 'GNN':
         use_gnn = True
-    train_data = DataLoader(config.train_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug)
-    valid_data = DataLoader(config.valid_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug)
+    train_data = DataLoader(config.train_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num)
+    valid_data = DataLoader(config.valid_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num)
 
     # model
     print('building model...\n')
@@ -477,7 +479,7 @@ def main():
         logging("Best score: %.6f\n" % best_score)
     else:
         assert args.restore is not None
-        test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug)
+        test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug, args.train_num)
         if args.topic:
             utils.write_embedding(model.get_user.use_emb.weight.detach().cpu().numpy(), log_path, epoch)
             eval_bleu_with_topic(model, vocab, test_data, epoch, updates)

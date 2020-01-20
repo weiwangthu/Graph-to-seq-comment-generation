@@ -192,7 +192,7 @@ class Batch:
 
 
 class DataLoader:
-    def __init__(self, filename, batch_size, vocab, adj_type, use_gnn, model, is_train=True, debug=False):
+    def __init__(self, filename, batch_size, vocab, adj_type, use_gnn, model, is_train=True, debug=False, train_num=0):
         self.batch_size = batch_size
         self.vocab = vocab
         # self.max_len = MAX_LENGTH
@@ -202,6 +202,7 @@ class DataLoader:
 
         self.is_train = is_train
         self.debug = debug
+        self.train_num = train_num
 
         self.adj_type = adj_type
         self.use_gnn = use_gnn
@@ -224,6 +225,9 @@ class DataLoader:
 
             if len(articles) > 100 and self.debug:
                 break
+            if self.train_num > 0:
+                if len(articles) >= self.train_num:
+                    break
         # random.shuffle(articles)
 
         data = []
