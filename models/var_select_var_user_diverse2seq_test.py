@@ -101,6 +101,8 @@ class var_select_var_user_diverse2seq_test(nn.Module):
 
         # kld select
         kld_select = out_dict['kld_select']
+        if self.config.min_select > 0:
+            kld_select = torch.abs(kld_select - self.config.min_select)
 
         # rank and reg loss
         rank_loss = out_dict['rank']
@@ -284,7 +286,6 @@ class var_select_var_user_diverse2seq_test(nn.Module):
 
         for j in range(batch_size):
             b = beam[j]
-            # n_best = 1
             scores, ks = b.sortFinished(minimum=n_best)
             hyps, attn = [], []
             for i, (times, k) in enumerate(ks[:n_best]):

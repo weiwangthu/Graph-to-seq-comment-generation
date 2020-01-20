@@ -103,6 +103,8 @@ class var_select_var_user_diverse2seq_test3(nn.Module):
 
         # kld select
         kld_select = out_dict['kld_select']
+        if self.config.min_select > 0:
+            kld_select = torch.abs(kld_select - self.config.min_select)
 
         # rank and reg loss
         rank_loss = out_dict['rank']
@@ -230,7 +232,7 @@ class var_select_var_user_diverse2seq_test3(nn.Module):
         return sample_ids, final_outputs[1]
 
     # TODO: fix beam search
-    def beam_sample(self, batch, use_cuda, beam_size=1):
+    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
@@ -292,16 +294,15 @@ class var_select_var_user_diverse2seq_test3(nn.Module):
 
         for j in range(batch_size):
             b = beam[j]
-            n_best = 1
             scores, ks = b.sortFinished(minimum=n_best)
             hyps, attn = [], []
             for i, (times, k) in enumerate(ks[:n_best]):
                 hyp, att = b.getHyp(times, k)
                 hyps.append(hyp)
                 attn.append(att.max(1)[1])
-            allHyps.append(hyps[0])
-            allScores.append(scores[0])
-            allAttn.append(attn[0])
+            allHyps.append(hyps)
+            allScores.append(scores)
+            allAttn.append(attn)
 
         # print(allHyps)
         # print(allAttn)
