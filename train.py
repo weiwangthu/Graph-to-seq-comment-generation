@@ -62,6 +62,8 @@ def parse_args():
                         help="beam_search")
     parser.add_argument('-n_best', type=int, default=5,
                         help="beam_search")
+    parser.add_argument('-n_topic', type=int, default=5,
+                        help="beam_search")
 
     parser.add_argument('-log', default='', type=str,
                         help="log directory")
@@ -277,8 +279,8 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
     model.eval()
     multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
 
-    candidate = [[] for _ in range(10)]
-    for i in range(10):
+    candidate = [[] for _ in range(args.n_topic)]
+    for i in range(args.n_topic):
         print('decode topic %d' % i)
         for batch in tqdm(valid_data, disable=not args.verbose):
             model.get_user.topic_id = i

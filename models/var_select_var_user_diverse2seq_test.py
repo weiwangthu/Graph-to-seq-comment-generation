@@ -136,8 +136,8 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         contexts, state = self.encoder(content, content_len)
 
         # select important information of body
-        context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
-        context_gates = context_gates[:, :, 0]  # bsz * n_context
+        org_context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
+        context_gates = org_context_gates[:, :, 0]  # bsz * n_context
 
         if not is_test:
             # comment encoder
@@ -170,6 +170,17 @@ class var_select_var_user_diverse2seq_test(nn.Module):
             z = torch.randn([contexts.size(0), self.config.n_z]).to(contexts.device)
             kld = 0.0
             kld_select = 0.0
+
+            # random
+            # context_gates = torch.bernoulli(context_gates)
+
+            # gumbel
+            # context_gates = gumbel_softmax(torch.log(org_context_gates + 1e-10), self.config.tau)
+            # context_gates = context_gates[:, :, 0]
+
+            # best
+            context_gates[context_gates > 0.5] = 1.0
+            context_gates[context_gates <= 0.5] = 0.0
 
             post_context_gates = context_gates
 
