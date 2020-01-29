@@ -173,6 +173,9 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -train_num 100000 \
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content -train_num 100000 \
   -model var_select_var_user_diverse2seq_test -log m_5c_var_select_var_user_diverse2seq_test2_tau0.5_gama0_kld0.1_sel0.1_r1_re0.01_m0.1 \
   -tau 0.5 -gama1 0.0 -gama_kld 0.1 -gama_select 0.1 -gama_rank 1.0 -gama_reg 0.01 -min_select 0.1
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model var_select_var_user_diverse2seq_test -log 5c_var_select_var_user_diverse2seq_test2_tau0.5_gama0.005_kld0.05_sel0.05_r1_re0.01_fix \
+  -tau 0.5 -gama1 0.005 -gama_kld 0.05 -gama_select 0.05 -gama_rank 1.0 -gama_reg 0.01
 
 # test2 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
@@ -187,6 +190,9 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content -train_num 100000 \
   -model var_select_var_user_diverse2seq_test2 -log m_5c_var_select_var_user_diverse2seq_test22_tau0.5_gama0_kld0.05_sel0.1_r1_re0.01_m0.1 \
   -tau 0.5 -gama1 0.0 -gama_kld 0.05 -gama_select 0.1 -gama_rank 1.0 -gama_reg 0.01 -n_z 256 -min_select 0.1
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model var_select_var_user_diverse2seq_test2 -log 5c_var_select_var_user_diverse2seq_test22_tau0.5_gama0.005_kld0.05_sel0.05_r1_re0.01_fix \
+  -tau 0.5 -gama1 0.005 -gama_kld 0.05 -gama_select 0.05 -gama_rank 1.0 -gama_reg 0.01 -n_z 256
 
 # test3 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
@@ -204,6 +210,9 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -train_num 100000 \
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -train_num 100000 \
   -model var_select_var_user_diverse2seq_test3 -log m_5c_var_select_var_user_diverse2seq_test3_tau0.5_gama0_kld0.1_sel0.1_r1_re0.01_m0.0 \
   -tau 0.5 -gama1 0.0 -gama_kld 0.1 -gama_select 0.1 -gama_rank 1.0 -gama_reg 0.01 -n_z 256 -min_select 0.0
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model var_select_var_user_diverse2seq_test3 -log 5c_var_select_var_user_diverse2seq_test3_tau0.5_gama0.005_kld0.05_sel0.05_r1_re0.01_fix \
+  -tau 0.5 -gama1 0.005 -gama_kld 0.05 -gama_select 0.05 -gama_rank 1.0 -gama_reg 0.01 -n_z 256
 
 # test4 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
@@ -212,7 +221,9 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
   -model var_select_var_user_diverse2seq_test4 -log 5c_var_select_var_user_diverse2seq_test4_tau0.5_gama0.005_kld0.05_sel0.05_r1_re0.01 \
   -tau 0.5 -gama1 0.005 -gama_kld 0.05 -gama_select 0.05 -gama_rank 1.0 -gama_reg 0.01 -n_z 256
-
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model var_select_var_user_diverse2seq_test4 -log 5c_var_select_var_user_diverse2seq_test4_tau0.5_gama0.005_kld0.05_sel0.05_r1_re0.01_fix \
+  -tau 0.5 -gama1 0.005 -gama_kld 0.05 -gama_select 0.05 -gama_rank 1.0 -gama_reg 0.01 -n_z 256
 
 
 # debug
