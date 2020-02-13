@@ -46,13 +46,15 @@ class GetUser(nn.Module):
         if not is_test:
             p_user = F.softmax(self.linear(latent_context), dim=-1)  # bsz * 10
             h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
+            selected_user = torch.argmax(p_user, dim=-1)
         else:
             if self.topic_id == -1:
                 ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, 10)
             else:
                 ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).fill_(self.topic_id)
             h_user = self.use_emb(ids)
-        return h_user
+            selected_user = ids
+        return h_user, selected_user
 
 class var_select_var_user_diverse2seq_test(nn.Module):
 
@@ -121,6 +123,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
             'reg': reg_loss,
             'pri_gates': out_dict['pri_gates'],
             'user_norm': out_dict['user_norm'],
+            'selected_user': out_dict['selected_user'],
         }
 
     def encode(self, batch, is_test=False):
@@ -195,7 +198,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
         # get user
-        h_user = self.get_user(z)
+        h_user, selected_user = self.get_user(z)
         h_user_neg = torch.roll(h_user, 1, dims=0)
         # user loss
         rank_loss = (1 - torch.sum(h_user*z, dim=-1) + torch.sum(h_user_neg*z, dim=-1)).clamp(min=0).mean()
@@ -219,6 +222,7 @@ class var_select_var_user_diverse2seq_test(nn.Module):
             'reg': reg_loss,
             'pri_gates': pri_gates.mean(),
             'user_norm': user_norm,
+            'selected_user': selected_user,
         }
 
     def sample(self, batch, use_cuda):
