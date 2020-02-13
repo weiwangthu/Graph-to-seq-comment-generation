@@ -7,6 +7,7 @@ import random
 import sys
 import time
 import collections
+import codecs
 
 import torch
 import torch.nn as nn
@@ -148,6 +149,9 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
         start_time = time.time()
         extra_meters = collections.defaultdict(lambda: AverageMeter())
 
+        # debug for selected_user
+        collect_result = [[] for _ in range(10)]
+
         if config.schedule:
             scheduler.step(epoch-1)
             print("Decaying learning rate to %g" % scheduler.get_lr()[0])
@@ -168,7 +172,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
 
                 # get other loss information
                 for k, v in result.items():
-                    if k in ['loss', 'acc']:
+                    if k in ['loss', 'acc', 'selected_user']:
                         continue  # these are already logged above
                     else:
                         extra_meters[k].update(v.item())
@@ -177,13 +181,21 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
             if torch.isnan(loss):
                 raise Exception('nan error')
 
-            loss.backward()
+            # optimizer
+            # loss.backward()
+            # optim.step()
+
             total_loss += loss.data.item()
             total_acc += acc.data.item()
-
-            optim.step()
             updates += 1
             local_updates += 1
+
+            # debug, for saving selected_user of each comment
+            selected_user = result['selected_user'].tolist()
+            for bid in range(len(selected_user)):
+                collect_result[selected_user[bid]].append(''.join(batch.examples[bid].ori_target))
+            if sum([len(uu) for uu in collect_result]) > 10000:
+                break
 
             if updates % config.print_interval == 0 or args.debug:
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
@@ -210,26 +222,33 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
             # if updates % config.save_interval == 0:
             #     save_model(log_path + 'checkpoint_%d_%d.pt'%(epoch, updates), model, optim, epoch, updates)
 
-        # log information
-        logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
-                % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
-        # log other loss
-        if len(extra_meters) > 0:
-            other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
-            logging(other_information + '\n')
+        # debug for selected_user
+        for uid in range(10):
+            with codecs.open(log_path + 'topic_comment.' + str(uid), 'w', 'utf-8') as f:
+                f.write('\n'.join(collect_result[uid]))
+                f.write('\n')
+        exit(0)
 
-        # eval and save model after each epoch
-        print('evaluating after %d updates...' % updates)
-        score = eval_loss(model, vocab, valid_data, epoch, updates)
-        scores.append(score)
-
-        if score <= best_score:
-            save_model(log_path + 'checkpoint_best.pt', model, optim, epoch, updates, best_score)
-            best_score = score
-
-        # save every epoch
-        save_model(log_path + 'checkpoint_last.pt', model, optim, epoch, updates, best_score)
-        save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates, best_score)
+        # # log information
+        # logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
+        #         % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+        # # log other loss
+        # if len(extra_meters) > 0:
+        #     other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
+        #     logging(other_information + '\n')
+        #
+        # # eval and save model after each epoch
+        # print('evaluating after %d updates...' % updates)
+        # score = eval_loss(model, vocab, valid_data, epoch, updates)
+        # scores.append(score)
+        #
+        # if score <= best_score:
+        #     save_model(log_path + 'checkpoint_best.pt', model, optim, epoch, updates, best_score)
+        #     best_score = score
+        #
+        # # save every epoch
+        # save_model(log_path + 'checkpoint_last.pt', model, optim, epoch, updates, best_score)
+        # save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates, best_score)
     return best_score
 
 
