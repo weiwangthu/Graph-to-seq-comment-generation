@@ -41,7 +41,9 @@ def parse_args():
                                  'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq',
                                  'select2seq_test', 'var_select_var_user_diverse2seq_test',
                                  'var_select_var_user_diverse2seq_test2', 'var_select_var_user_diverse2seq_test3',
-                                 'var_select_var_user_diverse2seq_test4'])
+                                 'var_select_var_user_diverse2seq_test4',
+                                 'var_select2seq_test', 'var_select_user2seq_test'
+                                 ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
     parser.add_argument('-use_copy', default=False, action="store_true",
@@ -182,20 +184,20 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 raise Exception('nan error')
 
             # optimizer
-            # loss.backward()
-            # optim.step()
+            loss.backward()
+            optim.step()
 
             total_loss += loss.data.item()
             total_acc += acc.data.item()
             updates += 1
             local_updates += 1
 
-            # debug, for saving selected_user of each comment
-            selected_user = result['selected_user'].tolist()
-            for bid in range(len(selected_user)):
-                collect_result[selected_user[bid]].append(''.join(batch.examples[bid].ori_target))
-            if sum([len(uu) for uu in collect_result]) > 10000:
-                break
+            # # debug, for saving selected_user of each comment
+            # selected_user = result['selected_user'].tolist()
+            # for bid in range(len(selected_user)):
+            #     collect_result[selected_user[bid]].append(''.join(batch.examples[bid].ori_target))
+            # if sum([len(uu) for uu in collect_result]) > 10000:
+            #     break
 
             if updates % config.print_interval == 0 or args.debug:
                 logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
@@ -222,33 +224,33 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
             # if updates % config.save_interval == 0:
             #     save_model(log_path + 'checkpoint_%d_%d.pt'%(epoch, updates), model, optim, epoch, updates)
 
-        # debug for selected_user
-        for uid in range(10):
-            with codecs.open(log_path + 'topic_comment.' + str(uid), 'w', 'utf-8') as f:
-                f.write('\n'.join(collect_result[uid]))
-                f.write('\n')
-        exit(0)
+        # # debug for selected_user
+        # for uid in range(10):
+        #     with codecs.open(log_path + 'topic_comment.' + str(uid), 'w', 'utf-8') as f:
+        #         f.write('\n'.join(collect_result[uid]))
+        #         f.write('\n')
+        # exit(0)
 
-        # # log information
-        # logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
-        #         % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
-        # # log other loss
-        # if len(extra_meters) > 0:
-        #     other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
-        #     logging(other_information + '\n')
-        #
-        # # eval and save model after each epoch
-        # print('evaluating after %d updates...' % updates)
-        # score = eval_loss(model, vocab, valid_data, epoch, updates)
-        # scores.append(score)
-        #
-        # if score <= best_score:
-        #     save_model(log_path + 'checkpoint_best.pt', model, optim, epoch, updates, best_score)
-        #     best_score = score
-        #
-        # # save every epoch
-        # save_model(log_path + 'checkpoint_last.pt', model, optim, epoch, updates, best_score)
-        # save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates, best_score)
+        # log information
+        logging("time: %6.3f, epoch: %3d, updates: %8d, train loss: %6.3f, train acc: %.3f\n"
+                % (time.time() - start_time, epoch, updates, total_loss / local_updates, total_acc / local_updates))
+        # log other loss
+        if len(extra_meters) > 0:
+            other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
+            logging(other_information + '\n')
+
+        # eval and save model after each epoch
+        print('evaluating after %d updates...' % updates)
+        score = eval_loss(model, vocab, valid_data, epoch, updates)
+        scores.append(score)
+
+        if score <= best_score:
+            save_model(log_path + 'checkpoint_best.pt', model, optim, epoch, updates, best_score)
+            best_score = score
+
+        # save every epoch
+        save_model(log_path + 'checkpoint_last.pt', model, optim, epoch, updates, best_score)
+        save_model(log_path + 'checkpoint_%d.pt' % epoch, model, optim, epoch, updates, best_score)
     return best_score
 
 
@@ -368,7 +370,7 @@ def eval_loss(model, vocab, valid_data, epoch, updates):
 
             # get other loss information
             for k, v in result.items():
-                if k in ['loss', 'acc']:
+                if k in ['loss', 'acc', 'selected_user']:
                     continue  # these are already logged above
                 else:
                     extra_meters[k].update(v.item())
@@ -451,6 +453,10 @@ def main():
         model = var_select_var_user_diverse2seq_test3(config, vocab, use_cuda)
     elif args.model == 'var_select_var_user_diverse2seq_test4':
         model = var_select_var_user_diverse2seq_test4(config, vocab, use_cuda)
+    elif args.model == 'var_select2seq_test':
+        model = var_select2seq_test(config, vocab, use_cuda)
+    elif args.model == 'var_select_user2seq_test':
+        model = var_select_user2seq_test(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
