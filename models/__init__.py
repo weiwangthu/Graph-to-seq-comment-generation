@@ -21,3 +21,4 @@ from models.var_select_var_user_diverse2seq_test3 import var_select_var_user_div
 from models.var_select_var_user_diverse2seq_test4 import var_select_var_user_diverse2seq_test4
 from models.var_select2seq_test import var_select2seq_test
 from models.var_select_user2seq_test import var_select_user2seq_test
+from models.user2seq_test import user2seq_test
