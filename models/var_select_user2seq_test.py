@@ -207,7 +207,7 @@ class var_select_user2seq_test(nn.Module):
         if use_cuda:
             batch = move_to_cuda(batch)
         contexts, state, context_gates, comment_rep, _, _ = self.encode(batch, True)
-        h_user = self.get_user(contexts, True)
+        h_user, _ = self.get_user(contexts, True)
 
         bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
         bos = bos.to(contexts.device)
@@ -221,7 +221,7 @@ class var_select_user2seq_test(nn.Module):
         if use_cuda:
             batch = move_to_cuda(batch)
         contexts, enc_state, context_gates, comment_rep, _, _ = self.encode(batch, True)
-        h_user = self.get_user(contexts, True)
+        h_user, _ = self.get_user(contexts, True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
