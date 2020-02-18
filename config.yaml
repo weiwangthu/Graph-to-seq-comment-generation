@@ -34,6 +34,7 @@ gama_reg: 1.0
 n_z: 64
 min_select: 0.0
 #n_user:
+one_user: False
 
 # optimize
 epoch: 40

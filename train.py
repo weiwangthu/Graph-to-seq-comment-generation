@@ -96,6 +96,8 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-topic', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
+    group.add_argument('-one_user', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)

@@ -16,10 +16,15 @@ class GetUser(nn.Module):
         self.linear = nn.Linear(config.n_z, 10)
         self.use_emb = nn.Embedding(10, config.n_z)
         self.topic_id = -1
+        self.config = config
 
     def forward(self, latent_context, is_test=False):
         if not is_test:
             p_user = F.softmax(self.linear(latent_context), dim=-1)  # bsz * 10
+
+            if self.config.one_user:
+                p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+
             h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
             selected_user = torch.argmax(p_user, dim=-1)
         else:
