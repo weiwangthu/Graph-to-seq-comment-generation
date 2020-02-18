@@ -206,6 +206,9 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
   -model var_select_user2seq_test -log 5c_var_select_user2seq_test_tau0.5_gama0_sel0.1_re0_m0.1 \
   -tau 0.5 -gama1 0 -gama_select 0.1 -gama_reg 0 -n_z 256 -min_select 0.1
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model var_select_user2seq_test -log 5c_var_select_user2seq_test_tau0.5_gama0_sel0.5_re0_m0.1 \
+  -tau 0.5 -gama1 0 -gama_select 0.5 -gama_reg 0 -n_z 256 -min_select 0.1
 
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
   -model user2seq_test -log 5c_user2seq_test_re0 \
@@ -268,6 +271,6 @@ CUDA_VISIBLE_DEVICES=0 python -m pudb.run  train.py -gpus 1 -use_content \
   -tau 0.5 -gama1 0.0 -gama_kld 0.05 -gama_select 0.0 -gama_rank 0.1 -gama_reg 0.01 -restore checkpoint_last.pt
 
 
-CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
   -model var_select_var_user_diverse2seq_test -log 5c_var_select_testxx \
   -tau 0.5 -gama1 0.005 -gama_kld 0.05 -gama_select 0.05 -gama_rank 1.0 -gama_reg 0.01
