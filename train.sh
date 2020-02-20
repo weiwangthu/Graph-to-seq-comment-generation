@@ -241,6 +241,12 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
   -model user2seq_test -log 5c_user2seq_test_tau0.5_re0.01_one \
   -tau 0.5 -gama_reg 0.01 -n_z 256 -one_user
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model user2seq_test -log 5c_user2seq_test_re1 \
+  -gama_reg 1 -n_z 256
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user2seq_test -log 5c_user2seq_test_tau0.5_re1_one \
+  -tau 0.5 -gama_reg 1 -n_z 256 -one_user
 
 # test2 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
