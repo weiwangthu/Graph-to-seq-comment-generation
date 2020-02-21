@@ -42,7 +42,8 @@ def parse_args():
                                  'select2seq_test', 'var_select_var_user_diverse2seq_test',
                                  'var_select_var_user_diverse2seq_test2', 'var_select_var_user_diverse2seq_test3',
                                  'var_select_var_user_diverse2seq_test4',
-                                 'var_select2seq_test', 'user2seq_test', 'var_select_user2seq_test'
+                                 'var_select2seq_test', 'user2seq_test', 'var_select_user2seq_test',
+                                 'autoenc'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -256,6 +257,40 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
     return best_score
 
 
+def eval_topic(model, train_data, epoch):
+    # debug for selected_user
+    collect_result = [[] for _ in range(10)]
+
+    model.train()
+    for batch in tqdm(train_data, disable=not args.verbose):
+        # with autograd.detect_anomaly():
+        outputs = model(batch, use_cuda)
+        target = batch.tgt
+        if use_cuda:
+            target = target.cuda()
+        if isinstance(outputs, dict):
+            result = model.compute_loss(outputs, target.transpose(0, 1)[1:])
+            loss = result['loss']
+        else:
+            loss, acc = model.compute_loss(outputs.transpose(0, 1), target.transpose(0, 1)[1:])
+        if torch.isnan(loss):
+            raise Exception('nan error')
+
+        # debug, for saving selected_user of each comment
+        selected_user = result['selected_user'].tolist()
+        for bid in range(len(selected_user)):
+            collect_result[selected_user[bid]].append(''.join(batch.examples[bid].ori_target))
+        if sum([len(uu) for uu in collect_result]) > 10000:
+            break
+
+    # debug for selected_user
+    for uid in range(10):
+        with codecs.open(log_path + 'topic_comment.%s.%s' % (str(epoch), str(uid)), 'w', 'utf-8') as f:
+            f.write('\n'.join(collect_result[uid]))
+            f.write('\n')
+    exit(0)
+
+
 def eval_bleu(model, vocab, valid_data, epoch, updates):
     model.eval()
     multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
@@ -461,6 +496,8 @@ def main():
         model = var_select_user2seq_test(config, vocab, use_cuda)
     elif args.model == 'user2seq_test':
         model = user2seq_test(config, vocab, use_cuda)
+    elif args.model == 'autoenc':
+        model = autoenc(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
@@ -508,6 +545,7 @@ def main():
     if not args.notrain:
         best_score = train(model, vocab, train_data, valid_data, scheduler, optim, epoch, updates, best_score)
         logging("Best score: %.6f\n" % best_score)
+        # eval_topic(model, train_data, epoch)
     else:
         assert args.restore is not None
         test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug, args.train_num)
