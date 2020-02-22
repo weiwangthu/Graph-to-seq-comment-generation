@@ -43,7 +43,7 @@ def parse_args():
                                  'var_select_var_user_diverse2seq_test2', 'var_select_var_user_diverse2seq_test3',
                                  'var_select_var_user_diverse2seq_test4',
                                  'var_select2seq_test', 'user2seq_test', 'var_select_user2seq_test',
-                                 'autoenc'
+                                 'autoenc', 'user_autoenc'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -498,6 +498,8 @@ def main():
         model = user2seq_test(config, vocab, use_cuda)
     elif args.model == 'autoenc':
         model = autoenc(config, vocab, use_cuda)
+    elif args.model == 'user_autoenc':
+        model = user_autoenc(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
