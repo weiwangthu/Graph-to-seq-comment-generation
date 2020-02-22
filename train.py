@@ -545,9 +545,11 @@ def main():
         scheduler = None
 
     if not args.notrain:
-        best_score = train(model, vocab, train_data, valid_data, scheduler, optim, epoch, updates, best_score)
-        logging("Best score: %.6f\n" % best_score)
-        # eval_topic(model, train_data, epoch)
+        if not args.topic:
+            best_score = train(model, vocab, train_data, valid_data, scheduler, optim, epoch, updates, best_score)
+            logging("Best score: %.6f\n" % best_score)
+        else:
+            eval_topic(model, train_data, epoch)
     else:
         assert args.restore is not None
         test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug, args.train_num)
