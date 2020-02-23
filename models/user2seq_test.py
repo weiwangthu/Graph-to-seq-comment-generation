@@ -66,8 +66,9 @@ class user2seq_test(nn.Module):
 
         # rank and reg loss
         reg_loss = out_dict['reg']
+        rank_loss = out_dict['rank']
 
-        loss = word_loss[0] + self.config.gama_reg * reg_loss
+        loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_rank * rank_loss
         return {
             'loss': loss,
             'word_loss': word_loss[0],
@@ -75,6 +76,7 @@ class user2seq_test(nn.Module):
             'reg': reg_loss,
             'user_norm': out_dict['user_norm'],
             'selected_user': out_dict['selected_user'],
+            'rank': rank_loss,
         }
 
     def encode(self, batch, is_test=False):
@@ -118,6 +120,16 @@ class user2seq_test(nn.Module):
         outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, None, h_user)
         # return outputs, gates, title_state[0], comment_state[0]
 
+        # match loss
+        news_rep = state[0][-1]
+        news_rep_neg = torch.roll(news_rep, 1, dims=0)
+        # pos_loss = torch.log(torch.sigmoid((comment_rep * news_rep).sum(dim=-1)) + 1e-10)
+        # neg_loss = torch.log(torch.sigmoid((comment_rep * news_rep_neg).sum(dim=-1)) + 1e-10)
+        # rank_loss = (- pos_loss + neg_loss).mean()
+
+        # user loss
+        rank_loss = (1 - torch.sum(comment_rep * news_rep, dim=-1) + torch.sum(comment_rep * news_rep_neg, dim=-1)).clamp(min=0).mean()
+
         user_norm = torch.norm(self.get_user.use_emb.weight, 2, dim=1).mean()
         return {
             'outputs': outputs,
@@ -125,6 +137,7 @@ class user2seq_test(nn.Module):
             'reg': reg_loss,
             'user_norm': user_norm,
             'selected_user': selected_user,
+            'rank': rank_loss,
         }
 
     def sample(self, batch, use_cuda):
