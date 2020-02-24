@@ -90,6 +90,9 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -notrain -beam_searc
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_best.pt \
   -model user2seq_test -log 5c_user2seq_test_tau0.5_re0.01_one \
   -tau 0.5 -gama_reg 0.01 -n_z 256 -one_user -topic
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_best.pt \
+  -model user2seq_test -log 5c_user2seq_test_re1 \
+  -gama_reg 1 -n_z 256 -topic
 
 # test2 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_best.pt \
@@ -247,6 +250,27 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
   -model user2seq_test -log 5c_user2seq_test_tau0.5_re1_one \
   -tau 0.5 -gama_reg 1 -n_z 256 -one_user
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user2seq_test -log 5c_user2seq_test_tau0.5_re0_one \
+  -tau 0.5 -gama_reg 0 -n_z 256 -one_user
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user2seq_test -log 5c_user2seq_test_tau0.5_re0_r1_one \
+  -tau 0.5 -gama_reg 0 -gama_rank 1 -n_z 256 -one_user
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user2seq_test -log 5c_user2seq_test_tau0.5_re0_r1_one_loss2 \
+  -tau 0.5 -gama_reg 0 -gama_rank 1 -n_z 256 -one_user
+
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model autoenc -log 5c_autoenc
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model user_autoenc -log 5c_user_autoenc \
+  -tau 0.5 -gama_reg 0 -gama_select 1 -n_z 256  -one_user
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld1_sel0_one \
+  -tau 0.5 -gama_reg 0 -gama_kld 1 -gama_select 0 -n_z 256  -one_user
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.1_sel0_one \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.1 -gama_select 0 -n_z 256  -one_user
 
 # test2 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
