@@ -24,3 +24,4 @@ from models.var_select_user2seq_test import var_select_user2seq_test
 from models.user2seq_test import user2seq_test
 from models.autoenc import autoenc
 from models.user_autoenc import user_autoenc
+from models.user_autoenc_vae import user_autoenc_vae
