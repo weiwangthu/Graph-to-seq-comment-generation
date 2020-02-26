@@ -85,7 +85,8 @@ class user_autoenc(nn.Module):
     def encode(self, batch, is_test=False):
         tgt, tgt_len = batch.tgt, batch.tgt_len
         _, comment_state = self.comment_encoder(tgt, tgt_len)  # output: bsz * n_hidden
-        return comment_state
+        comment_rep = comment_state[0][-1]  # bsz * n_hidden
+        return comment_rep
 
     def forward(self, batch, use_cuda):
         if use_cuda:
@@ -95,14 +96,16 @@ class user_autoenc(nn.Module):
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
         # get user
-        h_user, selected_user, p_user = self.get_user(comment_rep[0][-1])
+        h_user, selected_user, p_user = self.get_user(comment_rep)
 
         # user loss
         reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=h_user.dtype, device=h_user.device)
         reg_loss = torch.norm(reg_loss)
 
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], comment_rep, None, None)
+        zz = h_user.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
+        dec_state = (zz, zz)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], dec_state, None, None)
         # return outputs, gates, title_state[0], comment_state[0]
 
         user_norm = torch.norm(self.get_user.use_emb.weight, 2, dim=1).mean()
