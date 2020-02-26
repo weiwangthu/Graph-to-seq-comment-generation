@@ -73,7 +73,8 @@ class user_autoenc_vae(nn.Module):
 
         p_user = out_dict['p_user']
         select_entropy = p_user * torch.log(p_user + 1e-20)
-        select_entropy = select_entropy.mean(dim=0).sum()
+        # select_entropy = select_entropy.mean(dim=0).sum()
+        select_entropy = select_entropy.mean(dim=0).mean()
 
         loss = word_loss[0] + self.config.gama_reg * reg_loss + self.gama_kld * kld + self.config.gama_select * select_entropy
         return {
@@ -116,7 +117,8 @@ class user_autoenc_vae(nn.Module):
         selected_user, p_user = self.get_user(z)
 
         # kld loss
-        kld = torch.mean((p_user.unsqueeze(-1) * kld).sum(dim=1), 0).sum()
+        # kld = torch.mean((p_user.unsqueeze(-1) * kld).sum(dim=1), 0).sum()
+        kld = (p_user.unsqueeze(-1) * kld).sum(dim=1).sum(dim=1).mean()
 
         # user loss
         reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=z.dtype, device=z.device)
