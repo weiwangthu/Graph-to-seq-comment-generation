@@ -281,7 +281,7 @@ def eval_topic(model, train_data, epoch):
         # debug, for saving selected_user of each comment
         selected_user = result['selected_user'].tolist()
         for bid in range(len(selected_user)):
-            collect_result[selected_user[bid]].append(''.join(batch.examples[bid].ori_target))
+            collect_result[selected_user[bid]].append(batch.examples[bid].ori_target)
         if sum([len(uu) for uu in collect_result]) > 10000:
             break
 
@@ -291,8 +291,12 @@ def eval_topic(model, train_data, epoch):
     for ii in range(len(collect_result)):
         comment_count = len(collect_result[ii])
         if comment_count > 0:
-            comment_len = sum([len(com) for com in collect_result[ii]]) / comment_count
-            result_str.append('\t'.join([str(ii), str(comment_count), str(comment_len)]))
+            len_list = [len(com) for com in collect_result[ii]]
+            comment_len = sum(len_list) / comment_count
+            comment_min = min(len_list)
+            comment_max = max(len_list)
+            result_str.append('\t'.join([str(ii), str(comment_count),
+                                         str(comment_len), str(comment_min), str(comment_max)]))
             collect_ids.append(ii)
     with codecs.open(log_path + 'topic_comment.%s.statistic' % str(epoch), 'w', 'utf-8') as f:
         f.write('\n'.join(result_str))
@@ -301,6 +305,7 @@ def eval_topic(model, train_data, epoch):
     collect_num = 10
     for uid in collect_ids[:collect_num]:
         with codecs.open(log_path + 'topic_comment.%s.%s' % (str(epoch), str(uid)), 'w', 'utf-8') as f:
+            collect_result[uid] = list(map(lambda x: ''.join(x), collect_result[uid]))
             f.write('\n'.join(collect_result[uid]))
             f.write('\n')
     exit(0)
