@@ -13,8 +13,8 @@ class GetUser(nn.Module):
 
     def __init__(self, config):
         super(GetUser, self).__init__()
-        self.linear = nn.Linear(config.n_z, 10)
-        self.use_emb = nn.Embedding(10, config.n_z)
+        self.linear = nn.Linear(config.decoder_hidden_size, config.n_topic_num)
+        self.use_emb = nn.Embedding(config.n_topic_num, config.n_z)
         self.topic_id = -1
         self.config = config
 
@@ -29,7 +29,7 @@ class GetUser(nn.Module):
             selected_user = torch.argmax(p_user, dim=-1)
         else:
             if self.topic_id == -1:
-                ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, 10)
+                ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, self.use_emb.weight.size(0))
             else:
                 ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).fill_(self.topic_id)
             h_user = self.use_emb(ids)
@@ -55,6 +55,10 @@ class user_autoenc(nn.Module):
         self.tanh = nn.Tanh()
 
         self.comment_encoder = models.rnn_encoder(config, self.vocab_size, embedding=self.embedding)
+        if config.n_z != config.decoder_hidden_size:
+            self.mu_to_hidden = nn.Linear(config.n_z, config.decoder_hidden_size)
+        else:
+            self.mu_to_hidden = lambda x: x
 
         self.get_user = GetUser(config)
 
@@ -97,9 +101,10 @@ class user_autoenc(nn.Module):
 
         # get user
         h_user, selected_user, p_user = self.get_user(comment_rep)
+        h_user = self.mu_to_hidden(h_user)
 
         # user loss
-        reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=h_user.dtype, device=h_user.device)
+        reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(self.get_user.use_emb.weight.size(0), dtype=h_user.dtype, device=h_user.device)
         reg_loss = torch.norm(reg_loss)
 
         # decoder
