@@ -81,6 +81,8 @@ def parse_args():
     group = parser.add_argument_group('Hyperparameter')
     group.add_argument('-n_z', type=int, default=64, metavar='N',
                        help='save a checkpoint every N epochs')
+    group.add_argument('-n_topic_num', type=int, default=10, metavar='N',
+                       help='save a checkpoint every N epochs')
     group.add_argument('-tau', type=float, default=0.5, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama1', type=float, default=0.0, metavar='N',
@@ -259,7 +261,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
 
 def eval_topic(model, train_data, epoch):
     # debug for selected_user
-    collect_result = [[] for _ in range(10)]
+    collect_result = [[] for _ in range(config.n_topic_num)]
 
     model.train()
     for batch in tqdm(train_data, disable=not args.verbose):
@@ -284,7 +286,20 @@ def eval_topic(model, train_data, epoch):
             break
 
     # debug for selected_user
-    for uid in range(10):
+    result_str = []
+    collect_ids = []
+    for ii in range(len(collect_result)):
+        comment_count = len(collect_result[ii])
+        if comment_count > 0:
+            comment_len = sum([len(com) for com in collect_result[ii]]) / comment_count
+            result_str.append('\t'.join([str(ii), str(comment_count), str(comment_len)]))
+            collect_ids.append(ii)
+    with codecs.open(log_path + 'topic_comment.%s.statistic' % str(epoch), 'w', 'utf-8') as f:
+        f.write('\n'.join(result_str))
+        f.write('\n')
+
+    collect_num = 10
+    for uid in collect_ids[:collect_num]:
         with codecs.open(log_path + 'topic_comment.%s.%s' % (str(epoch), str(uid)), 'w', 'utf-8') as f:
             f.write('\n'.join(collect_result[uid]))
             f.write('\n')
