@@ -68,6 +68,7 @@ class user_autoenc(nn.Module):
 
         # rank and reg loss
         reg_loss = out_dict['reg']
+        dis_loss = out_dict['dis']
 
         p_user = out_dict['p_user']
 
@@ -75,7 +76,9 @@ class user_autoenc(nn.Module):
         select_entropy = avg_batch_select_prob * torch.log(avg_batch_select_prob + 1e-20)
         select_entropy = select_entropy.mean()
 
-        loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_select * select_entropy
+        loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_select * select_entropy \
+        + self.config.gama_rank * dis_loss
+
         return {
             'loss': loss,
             'word_loss': word_loss[0],
@@ -83,7 +86,8 @@ class user_autoenc(nn.Module):
             'reg': reg_loss,
             'user_norm': out_dict['user_norm'],
             'selected_user': out_dict['selected_user'],
-            'select_entropy': select_entropy
+            'select_entropy': select_entropy,
+            'dis': dis_loss
         }
 
     def encode(self, batch, is_test=False):
@@ -107,6 +111,11 @@ class user_autoenc(nn.Module):
         reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(self.get_user.use_emb.weight.size(0), dtype=h_user.dtype, device=h_user.device)
         reg_loss = torch.norm(reg_loss)
 
+        # distance loss
+        mse_e = ((comment_rep.detach() - h_user) ** 2).mean()
+        mse_z = ((h_user.detach() - comment_rep) ** 2).mean()
+        dis_loss = mse_e + 0.25 * mse_z
+
         # decoder
         zz = h_user.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
         dec_state = (zz, zz)
@@ -120,7 +129,8 @@ class user_autoenc(nn.Module):
             'reg': reg_loss,
             'user_norm': user_norm,
             'selected_user': selected_user,
-            'p_user': p_user
+            'p_user': p_user,
+            'dis': dis_loss,
         }
 
     def sample(self, batch, use_cuda):
