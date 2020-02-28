@@ -294,6 +294,20 @@ CUDA_VISIBLE_DEVICES=5 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=4 python train.py -gpus 1 -use_content \
   -model user_autoenc -log 5c_user_autoenc_tau0.5_re0_sel1_t100_z128_one \
   -tau 0.5 -gama_reg 0 -gama_select 1 -n_z 128  -n_topic_num 100 -one_user
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user_autoenc -log 5c_user_autoenc_tau0.5_re0_sel1_t100 \
+  -tau 0.5 -gama_reg 0 -gama_select 1 -n_z 256  -n_topic_num 100
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc -log 5c_user_autoenc_tau0.5_re0_sel1_t1000 \
+  -tau 0.5 -gama_reg 0 -gama_select 1 -n_z 256  -n_topic_num 1000
+
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user_autoenc -log 5c_user_autoenc_tau0.5_re0_sel1_r1_t100_one \
+  -tau 0.5 -gama_reg 0 -gama_select 1 -gama_rank 1 -n_z 256  -n_topic_num 100 -one_user
+
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_near -log 5c_user_autoenc_near_re0_r1_t100 \
+  -gama_reg 0 -gama_rank 1 -n_z 256  -n_topic_num 100
 
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
   -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld1_sel0_one \
