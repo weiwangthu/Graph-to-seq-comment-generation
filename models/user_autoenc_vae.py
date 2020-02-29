@@ -13,15 +13,15 @@ class GetUser(nn.Module):
 
     def __init__(self, config):
         super(GetUser, self).__init__()
-        self.linear1 = nn.Linear(config.n_z, 2 * config.n_z)
-        self.linear2 = nn.Linear(config.n_z * 2, 10)
+        self.linear1 = nn.Linear(config.n_z, int(config.n_z / 2))
+        self.linear2 = nn.Linear(int(config.n_z / 2), 10)
         self.use_emb = nn.Embedding(10, config.n_z)
         self.topic_id = -1
         self.config = config
 
     def forward(self, latent_context, is_test=False):
         if not is_test:
-            latent_context = F.relu(self.linear1(latent_context))
+            latent_context = F.tanh(self.linear1(latent_context))
             p_user = F.softmax(self.linear2(latent_context), dim=-1)  # bsz * 10
 
             if self.config.one_user:
