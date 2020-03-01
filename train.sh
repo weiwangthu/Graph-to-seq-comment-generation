@@ -308,6 +308,15 @@ CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
   -model user_autoenc_near -log 5c_user_autoenc_near_re0_r1_t100 \
   -gama_reg 0 -gama_rank 1 -n_z 256  -n_topic_num 100
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_near -log 5c_user_autoenc_near_re0_r0.1_t100 \
+  -gama_reg 0 -gama_rank 0.1 -n_z 256  -n_topic_num 100
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model user_autoenc_near -log 5c_user_autoenc_near_re0_r0.01_t100 \
+  -gama_reg 0 -gama_rank 0.01 -n_z 256  -n_topic_num 100
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_near -log 5c_user_autoenc_near_re0_r0.001_t100 \
+  -gama_reg 0 -gama_rank 0.001 -n_z 256  -n_topic_num 100
 
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
   -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld1_sel0_one \
@@ -339,6 +348,37 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
   -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.1_sel1_fixl \
   -tau 0.5 -gama_reg 0 -gama_kld 0.1 -gama_select 1 -n_z 256
+
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0_sel0_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0 -gama_select 0 -n_z 256
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld1_sel0_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 1 -gama_select 0 -n_z 256
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld1_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 1 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.001_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.001 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.0001_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.0001 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.01_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.01 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.1_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.1 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.05_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.05 -gama_select 1 -n_z 256
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0_kld0.02_sel1_fixl_fixu \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.02 -gama_select 1 -n_z 256
 
 # test2 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
