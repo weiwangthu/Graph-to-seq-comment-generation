@@ -282,7 +282,7 @@ def eval_topic(model, train_data, epoch):
         selected_user = result['selected_user'].tolist()
         for bid in range(len(selected_user)):
             collect_result[selected_user[bid]].append(batch.examples[bid].ori_target)
-        if sum([len(uu) for uu in collect_result]) > 10000:
+        if sum([len(uu) for uu in collect_result]) > min(config.n_topic_num * 1000, 200000):
             break
 
     # debug for selected_user
