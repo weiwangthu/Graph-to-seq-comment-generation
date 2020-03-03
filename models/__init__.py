@@ -26,3 +26,4 @@ from models.autoenc import autoenc
 from models.user_autoenc import user_autoenc
 from models.user_autoenc_vae import user_autoenc_vae
 from models.user_autoenc_near import user_autoenc_near
+from models.autoenc_lm import autoenc_lm
