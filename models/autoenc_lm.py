@@ -37,9 +37,9 @@ class autoenc_lm(nn.Module):
             'acc': word_loss[1],
         }
 
-    def init_hidden(self):
-        h_0 = torch.zeros(self.config.num_layers, self.config.batch_size, self.config.decoder_hidden_size)
-        c_0 = torch.zeros(self.config.num_layers, self.config.batch_size, self.config.decoder_hidden_size)
+    def init_hidden(self, batch_size):
+        h_0 = torch.zeros(self.config.num_layers, batch_size, self.config.decoder_hidden_size)
+        c_0 = torch.zeros(self.config.num_layers, batch_size, self.config.decoder_hidden_size)
         return move_to_cuda(h_0), move_to_cuda(c_0)
 
     def forward(self, batch, use_cuda):
@@ -47,7 +47,7 @@ class autoenc_lm(nn.Module):
             batch = move_to_cuda(batch)
 
         tgt, tgt_len = batch.tgt, batch.tgt_len
-        init_state = self.init_hidden()
+        init_state = self.init_hidden(tgt.size(0))
 
         # decoder
         outputs, final_state, attns = self.decoder(tgt[:, :-1], init_state, None, None)
