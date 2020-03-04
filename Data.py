@@ -1,6 +1,7 @@
 import torch
 import random
 import copy
+import numpy as np
 from graph_loader import *
 from util.nlp_utils import split_chinese_sentence, remove_stopwords
 from util.dict_utils import cosine_sim
@@ -80,7 +81,7 @@ class Example:
         memory: tag (oov has extend ids)
     """
 
-    def __init__(self, original_content, title, target, vocab, is_train, news_id):
+    def __init__(self, original_content, title, target, vocab, is_train, news_id, model):
         self.ori_title = title[:MAX_TITLE_LENGTH]
         self.ori_original_content = original_content[:MAX_ARTICLE_LENGTH]
         self.ori_news_id = news_id
@@ -94,12 +95,18 @@ class Example:
         if is_train:
             self.target = vocab.sent2id(self.ori_target, add_start=True, add_end=True)
 
-        self.sentence_content = split_chinese_sentence(self.ori_original_content)
-        self.sentence_content = [vocab.sent2id(sen[:MAX_ARTICLE_LENGTH]) for sen in self.sentence_content]
-        self.sentence_content_max_len = Batch.get_length(self.sentence_content, MAX_ARTICLE_LENGTH)
-        self.sentence_content, self.sentence_content_mask = Batch.padding_list_to_tensor(self.sentence_content, self.sentence_content_max_len.max().item())
+        if model == 'h_attention':
+            self.sentence_content = split_chinese_sentence(self.ori_original_content)
+            self.sentence_content = [vocab.sent2id(sen[:MAX_ARTICLE_LENGTH]) for sen in self.sentence_content]
+            self.sentence_content_max_len = Batch.get_length(self.sentence_content, MAX_ARTICLE_LENGTH)
+            self.sentence_content, self.sentence_content_mask = Batch.padding_list_to_tensor(self.sentence_content, self.sentence_content_max_len.max().item())
 
-        self.bow = self.bow_vec(self.original_content, MAX_ARTICLE_LENGTH)
+        if model == 'bow2seq':
+            self.bow = self.bow_vec(self.original_content, MAX_ARTICLE_LENGTH)
+
+        if model == 'autoenc_vae_bow':
+            if is_train:
+                self.tgt_bow = np.bincount(self.target, minlength=vocab.voc_size)
 
     def bow_vec(self, content, max_len):
         bow = {}
@@ -111,6 +118,13 @@ class Example:
         bow.sort(key=lambda k: k[1], reverse=True)
         bow.insert(0, (UNK, 1))
         return [word_id[0] for word_id in bow[:max_len]]
+
+    @staticmethod
+    def bag_of_word(words, length):
+        vec = [0 for _ in range(length)]
+        for w in words:
+            vec[w] += 1
+        return vec
 
 
 class Batch:
@@ -134,6 +148,9 @@ class Batch:
             bow_list = [e.bow for e in example_list]
             self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
             self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
+        elif model == 'autoenc_vae_bow':
+            if is_train:
+                self.tgt_bow = torch.LongTensor([e.tgt_bow for e in example_list])
         # seq2seq, select_diverse2seq, select2seq and so on.
         else:
             content_list = [e.original_content for e in example_list]
@@ -276,7 +293,7 @@ class DataLoader:
             if not self.is_train:
                 news_id = g["id"]
 
-            e = Example(original_content, title, target, self.vocab, self.is_train, news_id=news_id)
+            e = Example(original_content, title, target, self.vocab, self.is_train, news_id=news_id, model=self.model)
             results.append(e)
         return results
 
