@@ -8,6 +8,8 @@ import sys
 import time
 import collections
 import codecs
+import math
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -102,6 +104,10 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-one_user', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
+    group.add_argument('-dynamic1', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-dynamic2', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
@@ -167,6 +173,13 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
         model.train()
 
         for batch in tqdm(train_data, disable=not args.verbose):
+
+            if args.dynamic1:
+                # loss = opt.rec_coef * rec_loss + kld_coef * kld
+                model.gama_kld = min((math.tanh((updates - 15000.0 * 20) / 15000.0) + 1) / 2, -)
+            if args.dynamic2:
+                model.gama_kld = min(1, updates/(15000.0 * 40))
+
             # with autograd.detect_anomaly():
             model.zero_grad()
             outputs = model(batch, use_cuda)
@@ -213,6 +226,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 if len(extra_meters) > 0:
                     other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
                     logging(other_information + '\n')
+                logging("kld weight: %.6f\n" % model.gama_kld)
 
             # if updates % config.eval_interval == 0 or args.debug:
             #     print('evaluating after %d updates...' % updates)
@@ -303,11 +317,18 @@ def eval_topic(model, train_data, epoch):
         f.write('\n'.join(result_str))
         f.write('\n')
 
-    collect_num = 10
+    collect_num = 20
     for uid in collect_ids[:collect_num]:
+        topic_comments = list(map(lambda x: ''.join(x), collect_result[uid]))
         with codecs.open(log_path + 'topic_comment.%s.%s' % (str(epoch), str(uid)), 'w', 'utf-8') as f:
-            collect_result[uid] = list(map(lambda x: ''.join(x), collect_result[uid]))
-            f.write('\n'.join(collect_result[uid]))
+            f.write('\n'.join(topic_comments))
+            f.write('\n')
+        topic_words = [w for com in collect_result[uid] for w in com]
+        topic_words = Counter(topic_words)
+        topic_words = topic_words.most_common(1000)
+        topic_words = list(map(lambda x: '\t'.join([str(x[0]), str(x[1])]), topic_words))
+        with codecs.open(log_path + 'topic_comment.%s.%s.word' % (str(epoch), str(uid)), 'w', 'utf-8') as f:
+            f.write('\n'.join(topic_words))
             f.write('\n')
     exit(0)
 
