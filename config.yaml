@@ -12,9 +12,11 @@ decoder_hidden_size: 256
 num_layers: 2
 bidirec: True
 shared_vocab: True
-dropout: 0.1
 max_tgt_len: 50
 max_article_len: 600
+dropout: 0.1
+embedding_dropout: 0.5
+drop_dec_input: False
 
 # bow
 type_num: 4

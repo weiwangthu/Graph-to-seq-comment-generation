@@ -126,8 +126,111 @@ class rnn_decoder(nn.Module):
         self.dropout = nn.Dropout(config.dropout)
         self.config = config
 
+        if config.drop_dec_input:
+            self.embedding_dropout = nn.Dropout(p=config.embedding_dropout)
+
     def forward(self, inputs, init_state, contexts=None, context_gates=None):
         embs = self.embedding(inputs)
+        if self.config.drop_dec_input:
+            embs = self.embedding_dropout(embs)
+        outputs, state, attns = [], init_state, []
+        for emb in embs.split(1, dim=1):
+            output, state = self.rnn(emb.squeeze(1), state)
+            attn_weights = None
+            if contexts is not None:
+                output, attn_weights = self.attention(output, contexts, context_gates=context_gates)
+            output = self.dropout(output)
+            outputs += [self.linear(output)]
+            attns += [attn_weights]
+        outputs = torch.stack(outputs, 1)
+        if contexts is not None:
+            attns = torch.stack(attns, 1)
+        return outputs, state, attns
+
+    def decode_ae(self, input_length, init_state, bos):
+        outputs, state = [], init_state
+        emb = self.embedding(bos)
+
+        for _ in torch.arange(0, input_length):
+            output, state = self.rnn(emb, state)
+            output = self.dropout(output)
+            prob = self.linear(output)
+            word = prob.max(-1)[1]
+            emb = self.embedding(word)
+            outputs += [prob]
+        outputs = torch.stack(outputs, 1)
+        return outputs, state
+
+    def sample(self, input, init_state, contexts=None, context_gates=None):
+        # emb = self.embedding(input)
+        inputs, sample_ids = [], []
+        inputs += input
+
+        outputs, state, attns = [], init_state, []
+        max_time_step = self.config.max_tgt_len
+
+        for i in range(max_time_step):
+            # output: [batch, tgt_vocab_size]
+            output, state, attn_weights = self.sample_one(inputs[i], state, contexts, context_gates)  # inputs is a list we just built, not a big batch
+            predicted = output.max(dim=1)[1]  # max returns max_value, max_id
+            inputs += [predicted]
+            sample_ids += [predicted]
+            outputs += [output]
+            attns += [attn_weights]
+
+        sample_ids = torch.stack(sample_ids, 1)
+        if contexts is None:
+            return sample_ids, outputs
+        else:
+            attns = torch.stack(attns, 1)
+            return sample_ids, (outputs, attns)
+
+    def sample_one(self, input, state, contexts, context_gates=None):
+        emb = self.embedding(input)
+        output, state = self.rnn(emb, state)
+        attn_weigths = None
+        if contexts is not None:
+            output, attn_weigths = self.attention(output, contexts, context_gates=context_gates)
+        output = self.linear(output)
+
+        return output, state, attn_weigths
+
+
+class rnn_cat_decoder(nn.Module):
+
+    def __init__(self, config, vocab_size, embedding=None):
+        super(rnn_cat_decoder, self).__init__()
+        if embedding is not None:
+            self.embedding = embedding
+        else:
+            self.embedding = nn.Embedding(vocab_size, config.emb_size)
+        self.rnn = StackedLSTM(input_size=config.emb_size+config.n_z, hidden_size=config.decoder_hidden_size,
+                               num_layers=config.num_layers, dropout=config.dropout)
+
+        self.linear = nn.Linear(config.decoder_hidden_size, vocab_size)
+
+        if hasattr(config, 'att_act'):
+            activation = config.att_act
+            print('use attention activation %s' % activation)
+        else:
+            activation = None
+
+        self.attention = models.global_attention(config.decoder_hidden_size, activation)
+        # self.attention = models.global_attention(config.decoder_hidden_size, activation)
+        self.hidden_size = config.decoder_hidden_size
+        self.dropout = nn.Dropout(config.dropout)
+        self.config = config
+
+        if config.drop_dec_input:
+            self.embedding_dropout = nn.Dropout(p=config.embedding_dropout)
+
+    def forward(self, inputs, init_state, latent, contexts=None, context_gates=None):
+        embs = self.embedding(inputs)
+        if self.config.drop_dec_input:
+            embs = self.embedding_dropout(embs)
+        bsz, time, _ = embs.size()
+        latent = latent.unsqueeze(1).repeat(1, time, 1)
+        embs = torch.cat([embs, latent], dim=2)
         outputs, state, attns = [], init_state, []
         for emb in embs.split(1, dim=1):
             output, state = self.rnn(emb.squeeze(1), state)

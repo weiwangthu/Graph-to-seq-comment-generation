@@ -29,3 +29,4 @@ from models.user_autoenc_near import user_autoenc_near
 from models.autoenc_lm import autoenc_lm
 from models.autoenc_vae import autoenc_vae
 from models.autoenc_vae_bow import autoenc_vae_bow
+from models.autoenc_vae_cat import autoenc_vae_cat

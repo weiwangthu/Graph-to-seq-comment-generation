@@ -46,7 +46,7 @@ def parse_args():
                                  'var_select_var_user_diverse2seq_test4',
                                  'var_select2seq_test', 'user2seq_test', 'var_select_user2seq_test',
                                  'autoenc', 'user_autoenc', 'user_autoenc_vae', 'user_autoenc_near',
-                                 'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow'
+                                 'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow', 'autoenc_vae_cat'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -60,6 +60,8 @@ def parse_args():
                         help='whether to use bert or memory network or nothing in the word level of encoder')
     parser.add_argument('-graph_model', default='none', choices=['GCN', 'GNN', 'none'],
                         help='whether to use gcn in the encoder')
+    parser.add_argument('-drop_dec_input', default=False, action="store_true",
+                        help='whether to use title in the seq2seq')
 
     parser.add_argument('-notrain', default=False, action='store_true',
                         help="train or not")
@@ -176,9 +178,9 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
 
             if args.dynamic1:
                 # loss = opt.rec_coef * rec_loss + kld_coef * kld
-                model.gama_kld = min((math.tanh((updates - 15000.0 * 20) / 15000.0) + 1) / 2, -)
+                model.gama_kld = min(config.gama_kld, (math.tanh((updates - 15000.0 * 20) / 15000.0) + 1) / 2)
             if args.dynamic2:
-                model.gama_kld = min(1, updates/(15000.0 * 40))
+                model.gama_kld = min(config.gama_kld, updates/(15000.0 * 40))
 
             # with autograd.detect_anomaly():
             model.zero_grad()
@@ -552,6 +554,8 @@ def main():
         model = autoenc_vae(config, vocab, use_cuda)
     elif args.model == 'autoenc_vae_bow':
         model = autoenc_vae_bow(config, vocab, use_cuda)
+    elif args.model == 'autoenc_vae_cat':
+        model = autoenc_vae_cat(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
