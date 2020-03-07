@@ -110,6 +110,8 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-dynamic2', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
+    group.add_argument('-mid_max', type=float, default=20.0, metavar='N',
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
@@ -157,7 +159,7 @@ use_cuda = torch.cuda.is_available()
 
 def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, updates, org_best_score=None):
     scores = []
-    best_score = org_best_score if org_best_score is not None else 10.
+    best_score = org_best_score if org_best_score is not None else 10000.
     for epoch in range(org_epoch + 1, org_epoch + config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
@@ -178,9 +180,9 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
 
             if args.dynamic1:
                 # loss = opt.rec_coef * rec_loss + kld_coef * kld
-                model.gama_kld = min(config.gama_kld, (math.tanh((updates - 15000.0 * 20) / 15000.0) + 1) / 2)
+                model.gama_kld = config.gama_kld * min(1.0, (math.tanh((updates - 15000.0 * args.mid_max) / 15000.0) + 1) / 2)
             if args.dynamic2:
-                model.gama_kld = min(config.gama_kld, updates/(15000.0 * 40))
+                model.gama_kld = config.gama_kld * min(1.0, updates/(15000.0 * args.mid_max))
 
             # with autograd.detect_anomaly():
             model.zero_grad()
