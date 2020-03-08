@@ -87,7 +87,7 @@ class autoenc_vae(nn.Module):
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        z, kld = self.encode(batch)
+        z, kld = self.encode(batch, True)
         zz = z.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
         dec_state = (zz, zz)
 
@@ -102,7 +102,7 @@ class autoenc_vae(nn.Module):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        z, kld = self.encode(batch)
+        z, kld = self.encode(batch, True)
         zz = z.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
         dec_state = (zz, zz)
 
@@ -145,6 +145,8 @@ class autoenc_vae(nn.Module):
 
             # (b) Compute a vector of batch*beam word scores.
             output = unbottle(self.log_softmax(output))
+            if attn is None:
+                attn = output
             attn = unbottle(attn)
             # beam x tgt_vocab
 
