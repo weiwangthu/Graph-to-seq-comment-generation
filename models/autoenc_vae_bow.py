@@ -5,6 +5,7 @@ from torch.autograd import Variable
 import models
 from Data import *
 from util.misc_utils import move_to_cuda
+from util.vector_utils import find_norm, find_similar
 
 import numpy as np
 
@@ -86,7 +87,7 @@ class autoenc_vae_bow(nn.Module):
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        z, kld = self.encode(batch)
+        z, kld = self.encode(batch, True)
         zz = z.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
         dec_state = (zz, zz)
 
@@ -96,12 +97,28 @@ class autoenc_vae_bow(nn.Module):
 
         return sample_ids, final_outputs[1]
 
+    def word_match(self, norm_mat, word_, topN=10):
+
+        idx = self.vocab.word2id(word_)
+        similarity_meas, indexes = find_similar(norm_mat, norm_mat[idx])
+        words = self.vocab.id2sent(indexes[:topN])
+        return zip(words, similarity_meas[:topN])
+
+    def check_word_emb(self):
+        norm_mat = find_norm(self.dec_linear1.weight.detach().cpu().numpy())
+        while True:
+            query = input('input a word:')
+            similar_words = self.word_match(norm_mat, query)
+            for item in similar_words:
+                print (item[0], item[1])
+
     # TODO: fix beam search
     def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
+        self.check_word_emb()
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        z, kld = self.encode(batch)
+        z, kld = self.encode(batch, True)
         zz = z.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
         dec_state = (zz, zz)
 

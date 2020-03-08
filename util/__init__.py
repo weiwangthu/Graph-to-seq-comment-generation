@@ -7,3 +7,4 @@ from .list_utils import *
 from .nlp_utils import *
 from .tfidf_utils import *
 from .utils import *
+from .vector_utils import *
