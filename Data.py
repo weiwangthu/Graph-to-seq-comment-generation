@@ -104,7 +104,7 @@ class Example:
         if model == 'bow2seq':
             self.bow = self.bow_vec(self.original_content, MAX_ARTICLE_LENGTH)
 
-        if model == 'autoenc_vae_bow':
+        if model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow':
             if is_train:
                 self.tgt_bow = np.bincount(self.target, minlength=vocab.voc_size)
 
@@ -148,7 +148,7 @@ class Batch:
             bow_list = [e.bow for e in example_list]
             self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
             self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
-        elif model == 'autoenc_vae_bow':
+        elif model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow':
             if is_train:
                 self.tgt_bow = torch.LongTensor([e.tgt_bow for e in example_list])
         # seq2seq, select_diverse2seq, select2seq and so on.
