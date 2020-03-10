@@ -14,8 +14,8 @@ class GetUser(nn.Module):
     def __init__(self, config):
         super(GetUser, self).__init__()
         self.linear1 = nn.Linear(config.n_z, int(config.n_z / 2))
-        self.linear2 = nn.Linear(int(config.n_z / 2), 10)
-        self.use_emb = nn.Embedding(10, config.n_z)
+        self.linear2 = nn.Linear(int(config.n_z / 2), config.n_topic_num)
+        self.use_emb = nn.Embedding(config.n_topic_num, config.n_z)
         self.topic_id = -1
         self.config = config
 
@@ -30,7 +30,7 @@ class GetUser(nn.Module):
             selected_user = torch.argmax(p_user, dim=-1)
         else:
             if self.topic_id == -1:
-                ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, 10)
+                ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, self.use_emb.weight.size(0))
             else:
                 ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).fill_(self.topic_id)
             selected_user = ids
@@ -120,7 +120,9 @@ class user_autoenc_vae(nn.Module):
         kld = (p_user.unsqueeze(-1) * kld).sum(dim=1).sum(dim=1).mean()
 
         # user loss
-        reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - torch.eye(10, dtype=z.dtype, device=z.device)
+        identity_matrix = torch.eye(self.get_user.use_emb.weight.size(0), dtype=z.dtype, device=z.device)
+        reg_loss = torch.mm(self.get_user.use_emb.weight, self.get_user.use_emb.weight.t()) - identity_matrix
+        reg_loss = reg_loss * (1 - identity_matrix)
         reg_loss = torch.norm(reg_loss)
 
         # decoder
