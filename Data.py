@@ -30,6 +30,7 @@ class Vocab:
         self.voc_size = len(self._word2id)
         self.UNK_token = 3
         self.PAD_token = 0
+        self.stop_words = {word.strip() for word in open('stop_words.txt').readlines()}
 
     def load_vocab(self, vocab_file, vocab_size):
         for line in open(vocab_file):
@@ -50,8 +51,11 @@ class Vocab:
             return self._word2id[word]
         return self._word2id['[OOV]']
 
-    def sent2id(self, sent, add_start=False, add_end=False):
-        result = [self.word2id(word) for word in sent]
+    def sent2id(self, sent, add_start=False, add_end=False, remove_stop=False):
+        if not remove_stop:
+            result = [self.word2id(word) for word in sent]
+        else:
+            result = [self.word2id(word) for word in sent if word not in self.stop_words]
         if add_start:
             result = [self._word2id['[START]']] + result
 
@@ -71,7 +75,6 @@ class Vocab:
                 continue
             result.append(self._id2word[id])
         return result
-
 
 class Example:
     """
@@ -106,7 +109,13 @@ class Example:
 
         if model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow':
             if is_train:
-                self.tgt_bow = np.bincount(self.target, minlength=vocab.voc_size)
+                content_words = vocab.sent2id(self.ori_target, add_start=True, add_end=True, remove_stop=True)
+                # content_words = self.target
+                self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
+
+                # normal
+                self.tgt_bow[vocab.UNK_token] = 0
+                self.tgt_bow = float(self.tgt_bow) / float(np.sum(self.tgt_bow))
 
     def bow_vec(self, content, max_len):
         bow = {}
