@@ -28,6 +28,7 @@ class GetUser(nn.Module):
                 p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
 
             selected_user = torch.argmax(p_user, dim=-1)
+            h_user = None
         else:
             if self.topic_id == -1:
                 ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).random_(0, self.use_emb.weight.size(0))
@@ -35,7 +36,9 @@ class GetUser(nn.Module):
                 ids = torch.LongTensor(latent_context.size(0)).to(latent_context.device).fill_(self.topic_id)
             selected_user = ids
             p_user = None
-        return selected_user, p_user
+            h_user = self.use_emb(selected_user)
+            h_user += latent_context
+        return selected_user, p_user, h_user
 
 class user_autoenc_vae(nn.Module):
 
@@ -88,20 +91,25 @@ class user_autoenc_vae(nn.Module):
         }
 
     def encode(self, batch, is_test=False):
-        tgt, tgt_len = batch.tgt, batch.tgt_len
-        _, comment_state = self.comment_encoder(tgt, tgt_len)  # output: bsz * n_hidden
-        comment_rep = comment_state[0][-1]  # bsz * n_hidden
+        if not is_test:
+            # comment encoder
+            tgt, tgt_len = batch.tgt, batch.tgt_len
+            _, comment_state = self.comment_encoder(tgt, tgt_len)  # output: bsz * n_hidden
+            comment_rep = comment_state[0][-1]  # bsz * n_hidden
 
-        # comment vae
-        mu = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
-        logvar = self.hidden_to_logvar(comment_rep)  # Get log variance of latent z
+            # comment vae
+            mu = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
+            logvar = self.hidden_to_logvar(comment_rep)  # Get log variance of latent z
 
-        z = torch.randn([comment_rep.size(0), self.config.n_z]).to(mu.device)  # Noise sampled from Normal(0,1)
-        z = mu + z * torch.exp(0.5 * logvar)  # Reparameterization trick
+            z = torch.randn([comment_rep.size(0), self.config.n_z]).to(mu.device)  # Noise sampled from Normal(0,1)
+            z = mu + z * torch.exp(0.5 * logvar)  # Reparameterization trick
 
-        # for loss
-        z_prior_mean = z.unsqueeze(1) - self.get_user.use_emb.weight.unsqueeze(0)
-        kld = - 0.5 * (logvar.unsqueeze(1) - z_prior_mean**2)
+            # for loss
+            z_prior_mean = z.unsqueeze(1) - self.get_user.use_emb.weight.unsqueeze(0)
+            kld = - 0.5 * (logvar.unsqueeze(1) - z_prior_mean**2)
+        else:
+            z = torch.randn([batch.title_content.size(0), self.config.n_z]).to(batch.title_content.device)
+            kld = 0.0
 
         return z, kld
 
@@ -113,7 +121,7 @@ class user_autoenc_vae(nn.Module):
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
         # get user
-        selected_user, p_user = self.get_user(z)
+        selected_user, p_user, _ = self.get_user(z)
 
         # kld loss
         # kld = torch.mean((p_user.unsqueeze(-1) * kld).sum(dim=1), 0).sum()
@@ -144,12 +152,14 @@ class user_autoenc_vae(nn.Module):
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, comment_rep = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
+        z, kld = self.encode(batch, True)
+        _, _, h_user = self.get_user(z, True)
+        zz = h_user.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
+        dec_state = (zz, zz)
 
-        bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
-        bos = bos.to(contexts.device)
-        sample_ids, final_outputs = self.decoder.sample([bos], state, contexts, None, h_user)
+        bos = torch.ones(h_user.size(0)).long().fill_(self.vocab.word2id('[START]'))
+        bos = bos.to(h_user.device)
+        sample_ids, final_outputs = self.decoder.sample([bos], dec_state, None, None)
 
         return sample_ids, final_outputs[1]
 
@@ -158,10 +168,12 @@ class user_autoenc_vae(nn.Module):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, comment_rep = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
+        z, kld = self.encode(batch, True)
+        _, _, h_user = self.get_user(z, True)
+        zz = h_user.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
+        dec_state = (zz, zz)
 
-        batch_size = contexts.size(0)
+        batch_size = h_user.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
                 for _ in range(batch_size)]
 
@@ -174,13 +186,11 @@ class user_autoenc_vae(nn.Module):
 
         # Repeat everything beam_size times.
         # (batch, seq, nh) -> (beam*batch, seq, nh)
-        contexts = contexts.repeat(beam_size, 1, 1)
-        h_user = h_user.repeat(beam_size, 1)
         # (batch, seq) -> (beam*batch, seq)
         # src_mask = src_mask.repeat(beam_size, 1)
         # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
         # assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
-        dec_state = (rvar(enc_state[0]), rvar(enc_state[1]))  # layer, beam*batch, nh
+        dec_state = (rvar(dec_state[0]), rvar(dec_state[1]))  # layer, beam*batch, nh
         # decState.repeat_beam_size_times(beam_size)
 
         # (2) run the decoder to generate sentences, using beam search.
@@ -197,11 +207,13 @@ class user_autoenc_vae(nn.Module):
                 inp = inp.cuda()
 
             # Run one step.
-            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, None, h_user)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, None, None)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
             output = unbottle(self.log_softmax(output))
+            if attn is None:
+                attn = output
             attn = unbottle(attn)
             # beam x tgt_vocab
 
