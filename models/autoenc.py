@@ -60,6 +60,13 @@ class autoenc(nn.Module):
             'comment_state': comment_rep,
         }
 
+    def get_comment_rep(self, batch, use_cuda):
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        comment_rep = self.encode(batch)
+        comment_rep = torch.cat([comment_rep[0][-1], comment_rep[1][-1]], dim=-1)
+        return comment_rep
+
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)

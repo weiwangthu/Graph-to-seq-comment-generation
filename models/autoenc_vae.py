@@ -84,6 +84,16 @@ class autoenc_vae(nn.Module):
             'kld': kld,
         }
 
+    def get_comment_rep(self, batch, use_cuda):
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        # comment encoder
+        tgt, tgt_len = batch.tgt, batch.tgt_len
+        _, comment_state = self.comment_encoder(tgt, tgt_len)  # output: bsz * n_hidden
+        comment_rep = comment_state[0][-1]  # bsz * n_hidden
+        # comment_rep = self.hidden_to_mu(comment_rep)  # Get mean of lantent z
+        return comment_rep
+
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)

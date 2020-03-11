@@ -84,6 +84,16 @@ class autoenc_vae_bow(nn.Module):
             'mask': bow_mask
         }
 
+    def get_comment_rep(self, batch, use_cuda):
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        # comment encoder
+        tgt_bow = batch.tgt_bow
+        enc_hidden = torch.tanh(self.enc_linear1(tgt_bow.float()))
+        enc_hidden = torch.tanh(self.enc_linear2(enc_hidden))
+        # enc_hidden = self.hidden_to_mu(enc_hidden)  # Get mean of lantent z
+        return enc_hidden
+
     def sample(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
