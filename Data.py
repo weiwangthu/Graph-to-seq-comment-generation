@@ -115,7 +115,7 @@ class Example:
 
                 # normal
                 self.tgt_bow[vocab.UNK_token] = 0
-                self.tgt_bow = float(self.tgt_bow) / float(np.sum(self.tgt_bow))
+                self.tgt_bow = self.tgt_bow / np.sum(self.tgt_bow)
 
     def bow_vec(self, content, max_len):
         bow = {}
@@ -159,7 +159,7 @@ class Batch:
             self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
         elif model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow':
             if is_train:
-                self.tgt_bow = torch.LongTensor([e.tgt_bow for e in example_list])
+                self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
         # seq2seq, select_diverse2seq, select2seq and so on.
         else:
             content_list = [e.original_content for e in example_list]
