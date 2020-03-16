@@ -47,7 +47,7 @@ def parse_args():
                                  'var_select2seq_test', 'user2seq_test', 'var_select_user2seq_test',
                                  'autoenc', 'user_autoenc', 'user_autoenc_vae', 'user_autoenc_near',
                                  'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow', 'autoenc_vae_cat',
-                                 'user_autoenc_vae_bow',
+                                 'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -110,6 +110,8 @@ def parse_args():
     group.add_argument('-dynamic1', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
     group.add_argument('-dynamic2', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-dynamic3', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
     group.add_argument('-mid_max', type=float, default=20.0, metavar='N',
                        help='save a checkpoint every N epochs')
@@ -184,6 +186,8 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 model.gama_kld = config.gama_kld * min(1.0, (math.tanh((updates - 15000.0 * args.mid_max) / 15000.0) + 1) / 2)
             if args.dynamic2:
                 model.gama_kld = config.gama_kld * min(1.0, updates/(15000.0 * args.mid_max))
+            if args.dynamic3:
+                model.gama_select = max(config.gama_select, 1 - updates/(15000.0 * args.mid_max))
 
             # with autograd.detect_anomaly():
             model.zero_grad()
@@ -232,6 +236,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                     other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
                     logging(other_information + '\n')
                 logging("kld weight: %.6f\n" % model.gama_kld)
+                logging("select weight: %.6f\n" % model.gama_select)
 
             # if updates % config.eval_interval == 0 or args.debug:
             #     print('evaluating after %d updates...' % updates)
@@ -555,11 +560,11 @@ def main():
         model = autoenc_lm(config, vocab, use_cuda)
     elif args.model == 'autoenc_vae':
         model = autoenc_vae(config, vocab, use_cuda)
-    elif args.model == 'autoenc_vae_bow':
+    elif args.model == 'autoenc_vae_bow' or args.model == 'autoenc_vae_bow_norm':
         model = autoenc_vae_bow(config, vocab, use_cuda)
     elif args.model == 'autoenc_vae_cat':
         model = autoenc_vae_cat(config, vocab, use_cuda)
-    elif args.model == 'user_autoenc_vae_bow':
+    elif args.model == 'user_autoenc_vae_bow' or args.model == 'user_autoenc_vae_bow_norm':
         model = user_autoenc_vae_bow(config, vocab, use_cuda)
 
     # total number of parameters

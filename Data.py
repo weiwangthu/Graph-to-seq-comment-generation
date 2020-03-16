@@ -109,10 +109,12 @@ class Example:
 
         if model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow':
             if is_train:
-                content_words = vocab.sent2id(self.ori_target, add_start=True, add_end=True, remove_stop=True)
-                # content_words = self.target
+                content_words = self.target
                 self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
-
+        if model == 'autoenc_vae_bow_norm' or model == 'user_autoenc_vae_bow_norm':
+            if is_train:
+                content_words = vocab.sent2id(self.ori_target, add_start=True, add_end=True, remove_stop=True)
+                self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
                 # normal
                 self.tgt_bow[vocab.UNK_token] = 0
                 self.tgt_bow = self.tgt_bow / np.sum(self.tgt_bow)
@@ -157,7 +159,8 @@ class Batch:
             bow_list = [e.bow for e in example_list]
             self.bow_len = self.get_length(bow_list, MAX_ARTICLE_LENGTH)
             self.bow, self.bow_mask = self.padding_list_to_tensor(bow_list, self.bow_len.max().item())
-        elif model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow':
+        elif model == 'autoenc_vae_bow' or model == 'user_autoenc_vae_bow'\
+                or model == 'autoenc_vae_bow_norm' or model == 'user_autoenc_vae_bow_norm':
             if is_train:
                 self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
         # seq2seq, select_diverse2seq, select2seq and so on.
