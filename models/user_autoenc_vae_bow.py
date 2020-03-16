@@ -59,6 +59,7 @@ class user_autoenc_vae_bow(nn.Module):
         self.hidden_to_mu = nn.Linear(config.decoder_hidden_size, config.n_z)
         self.hidden_to_logvar = nn.Linear(config.decoder_hidden_size, config.n_z)
         self.gama_kld = config.gama_kld
+        self.gama_select = config.gama_select
 
         self.get_user = GetUser(config)
 
@@ -77,7 +78,7 @@ class user_autoenc_vae_bow(nn.Module):
         select_entropy = p_user * torch.log(p_user + 1e-20)
         select_entropy = select_entropy.sum(dim=1).mean()
 
-        loss = word_loss + self.config.gama_reg * reg_loss + self.gama_kld * kld + self.config.gama_select * select_entropy
+        loss = word_loss + self.config.gama_reg * reg_loss + self.gama_kld * kld + self.gama_select * select_entropy
         return {
             'loss': loss,
             'word_loss': word_loss,
