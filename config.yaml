@@ -26,6 +26,7 @@ head_num: 4
 tau: 0.5
 #tau: 1.0
 gama1: 0.0
+gama_kld_select: 0.0
 #gama1: 0.5
 #gama_kld: 0.0
 gama_kld: 0.05
@@ -33,6 +34,7 @@ gama_kld: 0.05
 gama_select: 0.4
 gama_rank: 1.0
 gama_reg: 1.0
+gama_bow: 1.0
 n_z: 64
 min_select: 0.0
 #n_user:

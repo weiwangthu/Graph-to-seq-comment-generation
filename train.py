@@ -47,7 +47,8 @@ def parse_args():
                                  'var_select2seq_test', 'user2seq_test', 'var_select_user2seq_test',
                                  'autoenc', 'user_autoenc', 'user_autoenc_vae', 'user_autoenc_near',
                                  'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow', 'autoenc_vae_cat',
-                                 'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm'
+                                 'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm',
+                                 'user2seq_test_new', 'var_select_user2seq_new'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -92,6 +93,8 @@ def parse_args():
     group.add_argument('-tau', type=float, default=0.5, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama1', type=float, default=0.0, metavar='N',
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_kld_select', type=float, default=0.0, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama_kld', type=float, default=0.05, metavar='N',
                        help='save a checkpoint every N epochs')
@@ -202,7 +205,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
 
                 # get other loss information
                 for k, v in result.items():
-                    if k in ['loss', 'acc', 'selected_user']:
+                    if k in ['loss', 'acc'] or v.numel() > 1:
                         continue  # these are already logged above
                     else:
                         extra_meters[k].update(v.item())
@@ -459,7 +462,7 @@ def eval_loss(model, vocab, valid_data, epoch, updates):
 
             # get other loss information
             for k, v in result.items():
-                if k in ['loss', 'acc', 'selected_user']:
+                if k in ['loss', 'acc'] or v.numel() > 1:
                     continue  # these are already logged above
                 else:
                     extra_meters[k].update(v.item())
@@ -566,6 +569,10 @@ def main():
         model = autoenc_vae_cat(config, vocab, use_cuda)
     elif args.model == 'user_autoenc_vae_bow' or args.model == 'user_autoenc_vae_bow_norm':
         model = user_autoenc_vae_bow(config, vocab, use_cuda)
+    elif args.model == 'user2seq_test_new':
+        model = user2seq_test_new(config, vocab, use_cuda)
+    elif args.model == 'var_select_user2seq_new':
+        model = var_select_user2seq_new(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")

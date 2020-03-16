@@ -31,3 +31,5 @@ from models.autoenc_vae import autoenc_vae
 from models.autoenc_vae_bow import autoenc_vae_bow
 from models.autoenc_vae_cat import autoenc_vae_cat
 from models.user_autoenc_vae_bow import user_autoenc_vae_bow
+from models.user2seq_test_new import user2seq_test_new
+from models.var_select_user2seq_new import var_select_user2seq_new

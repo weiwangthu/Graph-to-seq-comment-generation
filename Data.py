@@ -111,7 +111,8 @@ class Example:
             if is_train:
                 content_words = self.target
                 self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
-        if model == 'autoenc_vae_bow_norm' or model == 'user_autoenc_vae_bow_norm':
+        if model == 'autoenc_vae_bow_norm' or model == 'user_autoenc_vae_bow_norm' \
+                or model == 'user2seq_test_new' or model == 'var_select_user2seq_new':
             if is_train:
                 content_words = vocab.sent2id(self.ori_target, add_start=True, add_end=True, remove_stop=True)
                 self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
@@ -176,6 +177,10 @@ class Batch:
             title_content_list = [e.title + e.original_content for e in example_list]
             self.title_content_len = self.get_length(title_content_list, MAX_TITLE_LENGTH + MAX_ARTICLE_LENGTH)
             self.title_content, self.title_content_mask = self.padding_list_to_tensor(title_content_list, self.title_content_len.max().item())
+
+            if model == 'user2seq_test_new' or 'var_select_user2seq_new':
+                if is_train:
+                    self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
 
         if is_train:
             self.tgt_len = self.get_length([e.target for e in example_list])
