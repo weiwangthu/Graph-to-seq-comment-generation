@@ -81,6 +81,15 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_searc
   -model var_select_user2seq_test -log 5c_var_select_user2seq_test_tau0.5_gama0_sel0.5_re0_m0.1 \
   -tau 0.5 -gama1 0 -gama_select 0.5 -gama_reg 0 -n_z 256 -min_select 0.1 -topic
 
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model var_select_user2seq_new -log 5c_var_select_user2seq_new_tau0.5_re0_kld0.2_t100_dy3_0.2_gama0_klds0.5_m0.1  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 \
+  -gama1 0 -gama_kld_select 0.5 -min_select 0.1 -topic
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model var_select_user2seq_new -log 5c_var_select_user2seq_new_tau0.5_re0_kld0.2_t100_dy3_0.2_gama0_klds0.5_m0.1_cone  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 \
+  -gama1 0 -gama_kld_select 0.5 -min_select 0.1 -con_one_user -topic
+
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_best.pt \
   -model user2seq_test -log 5c_user2seq_test_re0 \
   -gama_reg 0 -n_z 256 -topic
@@ -100,6 +109,14 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -notrain -beam_searc
   -model user2seq_test -log 5c_user2seq_test_tau0.5_re0_r1_one_loss2 \
   -tau 0.5 -gama_reg 0 -gama_rank 1 -n_z 256 -one_user -topic
 
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model user2seq_test_new -log 5c_user2seq_test_new_tau0.5_re0_kld0.2_t100_dy3_0.2  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 -topic
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model user2seq_test_new -log 5c_user2seq_test_new_tau0.5_re0_kld0.2_t100_dy3_0.2_cone  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 -con_one_user -topic
+
+
 # vae, vae bow
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_best.pt \
   -model autoenc_vae -log 5c_autoenc_vae_dy2_0.05  \
@@ -112,6 +129,15 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_searc
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
   -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re0.1_sel1_fixl_fixu_dy1_0.05_10 \
   -tau 0.5 -gama_reg 0.1 -gama_select 1 -n_z 256 -dynamic1 -gama_kld 0.05 -mid_max 10.0 -topic
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re1_sel1_fixl_fixu_dy1_0.05_10 \
+  -tau 0.5 -gama_reg 1 -gama_select 1 -n_z 256 -dynamic1 -gama_kld 0.05 -mid_max 10.0 -topic
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re1_sel1_fixl_fixu_dy1_0.05_10_t100 \
+  -tau 0.5 -gama_reg 1 -gama_select 1 -n_z 256 -dynamic1 -gama_kld 0.05 -mid_max 10.0 -n_topic_num 100 -topic
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content -notrain -beam_search -restore checkpoint_last.pt \
+  -model user_autoenc_vae -log 5c_user_autoenc_vae_tau0.5_re1_sel1_fixl_fixu_dy1_0.05_10_t1000 \
+  -tau 0.5 -gama_reg 1 -gama_select 1 -n_z 256 -dynamic1 -gama_kld 0.05 -mid_max 10.0 -n_topic_num 1000 -topic
 
 
 # test2 model
@@ -252,6 +278,15 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
   -model var_select_user2seq_test -log 5c_var_select_user2seq_test_tau0.5_gama0_sel0.5_re0_m0.1 \
   -tau 0.5 -gama1 0 -gama_select 0.5 -gama_reg 0 -n_z 256 -min_select 0.1
 
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model var_select_user2seq_new -log 5c_var_select_user2seq_new_tau0.5_re0_kld0.2_t100_dy3_0.2_gama0_klds0.5_m0.1  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 \
+  -gama1 0 -gama_kld_select 0.5 -min_select 0.1
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model var_select_user2seq_new -log 5c_var_select_user2seq_new_tau0.5_re0_kld0.2_t100_dy3_0.2_gama0_klds0.5_m0.1_cone  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 \
+  -gama1 0 -gama_kld_select 0.5 -min_select 0.1 -con_one_user
+
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
   -model user2seq_test -log 5c_user2seq_test_re0 \
   -gama_reg 0 -n_z 256
@@ -279,6 +314,16 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
   -model user2seq_test -log 5c_user2seq_test_tau0.5_re0_r1_one_loss2 \
   -tau 0.5 -gama_reg 0 -gama_rank 1 -n_z 256 -one_user
+
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user2seq_test_new -log 5c_user2seq_test_new_tau0.5_re0_kld0.2_t100_dy3_0.2  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user2seq_test_new -log 5c_user2seq_test_new_tau0.5_re0_kld0.2_t100_dy3_0.2_cone  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20 -con_one_user
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user2seq_test_new -log 5c_user2seq_test_new_tau0.5_re0_kld0.2_t100_dy3_0.2_10  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 10
 
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
   -model autoenc -log 5c_autoenc
@@ -315,6 +360,15 @@ CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
   -model autoenc_vae -log 5c_autoenc_vae_kld0.05_drop \
   -gama_kld 0.05 -n_z 256 -drop_dec_input
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model autoenc_vae -log 5c_autoenc_vae_dy1_0.05_10  \
+  -dynamic1 -gama_kld 0.05 -n_z 256 -mid_max 10.0
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model autoenc_vae -log 5c_autoenc_vae_dy2_0.05_20  \
+  -dynamic2 -gama_kld 0.05 -n_z 256 -mid_max 20.0
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
+  -model autoenc_vae -log 5c_autoenc_vae_dy2_0.05_20_drop  \
+  -dynamic2 -gama_kld 0.05 -n_z 256 -mid_max 20.0 -drop_dec_input
 
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
   -model autoenc_vae_cat -log 5c_autoenc_vae_cat_kld0.1  \
@@ -356,6 +410,13 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
   -model autoenc_vae_bow -log 5c_autoenc_vae_bow_kld0.2  \
   -gama_kld 0.2 -n_z 64
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model autoenc_vae_bow -log 5c_autoenc_vae_bow_kld0.4  \
+  -gama_kld 0.4 -n_z 64
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model autoenc_vae_bow_norm -log 5c_autoenc_vae_bow_norm_kld0.2  \
+  -gama_kld 0.2 -n_z 64
+
 
 
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -use_content \
@@ -609,6 +670,25 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
   -model user_autoenc_vae_bow -log 5c_user_autoenc_vae_bow_re0.1_sel100_kld0.2  \
   -tau 0.5 -gama_reg 0.1 -gama_select 100 -gama_kld 0.2 -n_z 64
+
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae_bow -log 5c_user_autoenc_vae_bow_re0_kld0.2_t100_dy3_0.2  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae_bow_norm -log 5c_user_autoenc_vae_bow_norm_re0_kld0.2_t100_dy3_0.2  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -dynamic3 -gama_select 0.2 -mid_max 20
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae_bow -log 5c_user_autoenc_vae_bow_re0_kld0.2_t100_sel0.4  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 100 -gama_select 0.4
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae_bow -log 5c_user_autoenc_vae_bow_re0_kld0.2_t100_sel0.4_d128  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 128 -n_topic_num 100 -gama_select 0.4
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae_bow -log 5c_user_autoenc_vae_bow_re0_kld0.2_t100_sel0.4_d256  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 256 -n_topic_num 100 -gama_select 0.4
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 1 -use_content \
+  -model user_autoenc_vae_bow -log 5c_user_autoenc_vae_bow_re0_kld0.2_t1000_sel0.4  \
+  -tau 0.5 -gama_reg 0 -gama_kld 0.2 -n_z 64 -n_topic_num 1000 -gama_select 0.4
 
 # test2 model
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -use_content \
