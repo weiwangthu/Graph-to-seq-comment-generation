@@ -39,6 +39,7 @@ n_z: 64
 min_select: 0.0
 #n_user:
 one_user: False
+con_one_user: False
 n_topic_num: 10
 
 # optimize
