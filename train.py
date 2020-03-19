@@ -110,6 +110,8 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-one_user', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
+    group.add_argument('-con_one_user', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
     group.add_argument('-dynamic1', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
     group.add_argument('-dynamic2', default=False, action="store_true",
