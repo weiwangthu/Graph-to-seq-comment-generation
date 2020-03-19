@@ -52,7 +52,7 @@ class GetUser(nn.Module):
         latent_context = F.tanh(self.content_linear1(latent_context))
         p_user = F.softmax(self.content_linear2(latent_context), dim=-1)  # bsz * 10
 
-        if self.config.one_user:
+        if self.config.con_one_user:
             p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
 
         h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
@@ -296,8 +296,10 @@ class var_select_user2seq_new(nn.Module):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, context_gates, comment_rep, _, _ = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
+        contexts, enc_state, z, kld, post_context_gates, comment_rep, kld_select, context_gates = self.encode(batch, True)
+
+        # get user
+        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(enc_state[0][-1])
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
@@ -314,7 +316,7 @@ class var_select_user2seq_new(nn.Module):
         # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
         context_gates = context_gates.repeat(beam_size, 1)
-        h_user = h_user.repeat(beam_size, 1)
+        content_h_user = content_h_user.repeat(beam_size, 1)
         # (batch, seq) -> (beam*batch, seq)
         # src_mask = src_mask.repeat(beam_size, 1)
         # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
@@ -336,7 +338,7 @@ class var_select_user2seq_new(nn.Module):
                 inp = inp.cuda()
 
             # Run one step.
-            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, context_gates, h_user)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, context_gates, content_h_user)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
