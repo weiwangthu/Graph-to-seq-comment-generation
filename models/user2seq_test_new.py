@@ -132,7 +132,16 @@ class user2seq_test_new(nn.Module):
         join_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / (p_user_label + 1e-20))
         join_select_entropy = join_select_entropy.sum(dim=1).mean()
 
-        loss += self.gama_select * join_select_entropy
+        opt_loss = 0
+        if self.config.opt_join:
+            opt_loss = join_select_entropy
+        if self.config.opt_con:
+            opt_loss = con_select_entropy
+
+        if self.config.topic_min_select > 0:
+            opt_loss = torch.abs(opt_loss - self.config.min_select)
+
+        loss += self.gama_select * opt_loss
 
         return {
             'loss': loss,

@@ -120,6 +120,12 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-mid_max', type=float, default=20.0, metavar='N',
                        help='save a checkpoint every N epochs')
+    group.add_argument('-opt_join', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-opt_con', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-topic_min_select', type=float, default=0.0, metavar='N',
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
@@ -310,6 +316,7 @@ def eval_topic(model, train_data, epoch):
 
         # debug, for saving selected_user of each comment
         selected_user = result['selected_user'].tolist()
+        # selected_user = result['con_sel_user'].tolist()
         for bid in range(len(selected_user)):
             collect_result[selected_user[bid]].append(batch.examples[bid].ori_target)
         if sum([len(uu) for uu in collect_result]) > min(config.n_topic_num * 1000, 200000):
