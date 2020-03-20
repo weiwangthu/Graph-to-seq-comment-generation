@@ -126,6 +126,14 @@ class user2seq_test_new(nn.Module):
         con_select_entropy = con_select_entropy.sum(dim=1).mean()
 
         loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_bow * bow_word_loss + self.gama_kld * kld + self.gama_select * select_entropy
+
+        # guide topic selection
+        p_user_label = p_user.detach()
+        join_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / (p_user_label + 1e-20))
+        join_select_entropy = join_select_entropy.sum(dim=1).mean()
+
+        loss += self.gama_select * join_select_entropy
+
         return {
             'loss': loss,
             'word_loss': word_loss[0],
@@ -138,6 +146,7 @@ class user2seq_test_new(nn.Module):
             'select_entropy': select_entropy,
             'con_sel_user': out_dict['con_sel_user'],
             'con_sel_entropy': con_select_entropy,
+            'join_sel_entropy': join_select_entropy,
         }
 
     def encode(self, batch, is_test=False):

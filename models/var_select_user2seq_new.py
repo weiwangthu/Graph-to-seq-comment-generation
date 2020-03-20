@@ -142,6 +142,13 @@ class var_select_user2seq_new(nn.Module):
 
         loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_bow * bow_word_loss + self.gama_kld * kld + self.gama_select * select_entropy
 
+        # guide topic selection
+        p_user_label = p_user.detach()
+        join_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / (p_user_label + 1e-20))
+        join_select_entropy = join_select_entropy.sum(dim=1).mean()
+
+        loss += self.gama_select * join_select_entropy
+
         # gate loss
         gate_loss = out_dict['l1_gates']
 
@@ -151,6 +158,7 @@ class var_select_user2seq_new(nn.Module):
             kld_select = torch.abs(kld_select - self.config.min_select)
 
         loss += self.config.gama1 * gate_loss + self.gama_kld_select * kld_select
+
         return {
             'loss': loss,
             'word_loss': word_loss[0],
@@ -163,6 +171,7 @@ class var_select_user2seq_new(nn.Module):
             'select_entropy': select_entropy,
             'con_sel_user': out_dict['con_sel_user'],
             'con_sel_entropy': con_select_entropy,
+            'join_sel_entropy': join_select_entropy,
             'gate_loss': gate_loss,
             'kld_select_loss': kld_select,
             'pri_gates': out_dict['pri_gates'],
