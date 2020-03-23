@@ -122,7 +122,8 @@ class user2seq_test_new(nn.Module):
         select_entropy = select_entropy.sum(dim=1).mean()
 
         con_p_user = out_dict['con_p_user']
-        con_select_entropy = con_p_user * torch.log(con_p_user + 1e-20)
+        uniform = torch.ones_like(con_p_user) / con_p_user.size(-1)
+        con_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / uniform)
         con_select_entropy = con_select_entropy.sum(dim=1).mean()
 
         loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_bow * bow_word_loss + self.gama_kld * kld + self.gama_select * select_entropy
@@ -139,7 +140,7 @@ class user2seq_test_new(nn.Module):
             opt_loss = con_select_entropy
 
         if self.config.topic_min_select > 0:
-            opt_loss = torch.abs(opt_loss - self.config.min_select)
+            opt_loss = torch.abs(opt_loss - self.config.topic_min_select)
 
         loss += self.gama_select * opt_loss
 

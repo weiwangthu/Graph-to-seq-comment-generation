@@ -48,7 +48,7 @@ def parse_args():
                                  'autoenc', 'user_autoenc', 'user_autoenc_vae', 'user_autoenc_near',
                                  'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow', 'autoenc_vae_cat',
                                  'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm',
-                                 'user2seq_test_new', 'var_select_user2seq_new'
+                                 'user2seq_test_new', 'var_select_user2seq_new', 'var_select2seq_test_new'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -246,8 +246,10 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 if len(extra_meters) > 0:
                     other_information = ','.join('{:s}={:.3f}'.format(key, extra_meters[key].avg) for key in extra_meters.keys())
                     logging(other_information + '\n')
-                logging("kld weight: %.6f\n" % model.gama_kld)
-                logging("select weight: %.6f\n" % model.gama_select)
+                if hasattr(model, 'gama_kld'):
+                    logging("kld weight: %.6f\n" % model.gama_kld)
+                if hasattr(model, 'gama_select'):
+                    logging("select weight: %.6f\n" % model.gama_select)
 
             # if updates % config.eval_interval == 0 or args.debug:
             #     print('evaluating after %d updates...' % updates)
@@ -582,6 +584,8 @@ def main():
         model = user2seq_test_new(config, vocab, use_cuda)
     elif args.model == 'var_select_user2seq_new':
         model = var_select_user2seq_new(config, vocab, use_cuda)
+    elif args.model == 'var_select2seq_test_new':
+        model = var_select2seq_test_new(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
