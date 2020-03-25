@@ -44,6 +44,7 @@ n_topic_num: 10
 opt_join: False
 opt_con: False
 topic_min_select: 0.0
+gama_con_select: 0.0
 
 # optimize
 epoch: 40
