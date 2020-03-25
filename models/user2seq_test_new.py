@@ -45,8 +45,7 @@ class GetUser(nn.Module):
                 ids = torch.LongTensor(latent_context.size(0), 1).to(latent_context.device).fill_(self.topic_id)
             org_ids = indices.gather(dim=-1, index=ids).squeeze(dim=1)
             h_user = self.use_emb(org_ids)
-            selected_user = ids
-            p_user = None
+            selected_user = org_ids
         return h_user, selected_user, p_user
 
     def forward(self, latent_context, is_test=False):
@@ -99,6 +98,7 @@ class user2seq_test_new(nn.Module):
         self.hidden_to_logvar = nn.Linear(config.decoder_hidden_size, config.n_z)
         self.gama_kld = config.gama_kld
         self.gama_select = config.gama_select
+        self.gama_con_select = config.gama_con_select
 
         self.get_user = GetUser(config)
 
@@ -142,7 +142,7 @@ class user2seq_test_new(nn.Module):
         if self.config.topic_min_select > 0:
             opt_loss = torch.abs(opt_loss - self.config.topic_min_select)
 
-        loss += self.gama_select * opt_loss
+        loss += self.gama_con_select * opt_loss
 
         return {
             'loss': loss,
