@@ -48,7 +48,8 @@ def parse_args():
                                  'autoenc', 'user_autoenc', 'user_autoenc_vae', 'user_autoenc_near',
                                  'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow', 'autoenc_vae_cat',
                                  'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm',
-                                 'user2seq_test_new', 'var_select_user2seq_new', 'var_select2seq_test_new'
+                                 'user2seq_test_new', 'var_select_user2seq_new', 'var_select2seq_test_new',
+                                 'user2seq_expand',
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -126,6 +127,10 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-topic_min_select', type=float, default=0.0, metavar='N',
                        help='save a checkpoint every N epochs')
+    group.add_argument('-dynamic4', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_con_select', type=float, default=0.0, metavar='N',
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
@@ -199,6 +204,8 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 model.gama_kld = config.gama_kld * min(1.0, updates/(15000.0 * args.mid_max))
             if args.dynamic3:
                 model.gama_select = max(config.gama_select, 1 - updates/(15000.0 * args.mid_max))
+            if args.dynamic4:
+                model.gama_con_select = max(config.gama_con_select, 1 - updates/(15000.0 * args.mid_max))
 
             # with autograd.detect_anomaly():
             model.zero_grad()
@@ -250,6 +257,8 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                     logging("kld weight: %.6f\n" % model.gama_kld)
                 if hasattr(model, 'gama_select'):
                     logging("select weight: %.6f\n" % model.gama_select)
+                if hasattr(model, 'gama_con_select'):
+                    logging("con select weight: %.6f\n" % model.gama_con_select)
 
             # if updates % config.eval_interval == 0 or args.debug:
             #     print('evaluating after %d updates...' % updates)
@@ -317,8 +326,8 @@ def eval_topic(model, train_data, epoch):
             raise Exception('nan error')
 
         # debug, for saving selected_user of each comment
-        selected_user = result['selected_user'].tolist()
-        # selected_user = result['con_sel_user'].tolist()
+        # selected_user = result['selected_user'].tolist()
+        selected_user = result['con_sel_user'].tolist()
         for bid in range(len(selected_user)):
             collect_result[selected_user[bid]].append(batch.examples[bid].ori_target)
         if sum([len(uu) for uu in collect_result]) > min(config.n_topic_num * 1000, 200000):
@@ -586,6 +595,8 @@ def main():
         model = var_select_user2seq_new(config, vocab, use_cuda)
     elif args.model == 'var_select2seq_test_new':
         model = var_select2seq_test_new(config, vocab, use_cuda)
+    elif args.model == 'user2seq_expand':
+        model = user2seq_expand(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")

@@ -179,7 +179,7 @@ class Batch:
             self.title_content_len = self.get_length(title_content_list, MAX_TITLE_LENGTH + MAX_ARTICLE_LENGTH)
             self.title_content, self.title_content_mask = self.padding_list_to_tensor(title_content_list, self.title_content_len.max().item())
 
-            if model == 'user2seq_test_new' or 'var_select_user2seq_new' \
+            if model == 'user2seq_test_new' or model == 'var_select_user2seq_new' \
                     or model == 'var_select2seq_test_new':
                 if is_train:
                     self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
