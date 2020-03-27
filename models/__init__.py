@@ -35,3 +35,4 @@ from models.user2seq_test_new import user2seq_test_new
 from models.var_select_user2seq_new import var_select_user2seq_new
 from models.var_select2seq_test_new import var_select2seq_test_new
 from models.user2seq_expand import user2seq_expand
+from models.var_select_expand_user2seq import var_select_expand_user2seq
