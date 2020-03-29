@@ -75,8 +75,11 @@ class user_autoenc_vae_bow(nn.Module):
         reg_loss = out_dict['reg']
 
         p_user = out_dict['p_user']
+        # select_entropy = p_user * torch.log(p_user + 1e-20)
+        # select_entropy = select_entropy.sum(dim=1).mean()
+        p_user = p_user.mean(dim=0)
         select_entropy = p_user * torch.log(p_user + 1e-20)
-        select_entropy = select_entropy.sum(dim=1).mean()
+        select_entropy = select_entropy.sum()
 
         loss = word_loss + self.config.gama_reg * reg_loss + self.gama_kld * kld + self.gama_select * select_entropy
         return {
