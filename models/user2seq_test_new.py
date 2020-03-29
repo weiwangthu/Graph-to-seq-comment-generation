@@ -29,9 +29,11 @@ class GetUser(nn.Module):
             p_user = F.softmax(self.content_linear2(latent_context), dim=-1)  # bsz * 10
 
             if self.config.con_one_user:
-                p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+                g_p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+            else:
+                g_p_user = p_user
 
-            h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
+            h_user = (self.use_emb.weight.unsqueeze(0) * g_p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
             selected_user = torch.argmax(p_user, dim=-1)
         else:
             latent_context = F.tanh(self.content_linear1(latent_context))
@@ -118,8 +120,11 @@ class user2seq_test_new(nn.Module):
         reg_loss = out_dict['reg']
 
         p_user = out_dict['p_user']
+        # select_entropy = p_user * torch.log(p_user + 1e-20)
+        # select_entropy = select_entropy.sum(dim=1).mean()
+        p_user = p_user.mean(dim=0)
         select_entropy = p_user * torch.log(p_user + 1e-20)
-        select_entropy = select_entropy.sum(dim=1).mean()
+        select_entropy = select_entropy.sum()
 
         con_p_user = out_dict['con_p_user']
         uniform = torch.ones_like(con_p_user) / con_p_user.size(-1)
