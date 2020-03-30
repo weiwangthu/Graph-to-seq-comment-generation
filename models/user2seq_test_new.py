@@ -122,14 +122,18 @@ class user2seq_test_new(nn.Module):
         p_user = out_dict['p_user']
         # select_entropy = p_user * torch.log(p_user + 1e-20)
         # select_entropy = select_entropy.sum(dim=1).mean()
-        p_user = p_user.mean(dim=0)
-        select_entropy = p_user * torch.log(p_user + 1e-20)
+        batch_p_user = p_user.mean(dim=0)
+        select_entropy = batch_p_user * torch.log(batch_p_user + 1e-20)
         select_entropy = select_entropy.sum()
 
         con_p_user = out_dict['con_p_user']
-        uniform = torch.ones_like(con_p_user) / con_p_user.size(-1)
-        con_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / uniform)
-        con_select_entropy = con_select_entropy.sum(dim=1).mean()
+        # uniform = torch.ones_like(con_p_user) / con_p_user.size(-1)
+        # con_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / uniform)
+        # con_select_entropy = con_select_entropy.sum(dim=1).mean()
+        batch_con_p_user = con_p_user.mean(dim=0)
+        uniform = torch.ones_like(batch_con_p_user) / batch_con_p_user.size(-1)
+        con_select_entropy = batch_con_p_user * torch.log((batch_con_p_user + 1e-20) / uniform)
+        con_select_entropy = con_select_entropy.sum()
 
         loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_bow * bow_word_loss + self.gama_kld * kld + self.gama_select * select_entropy
 
