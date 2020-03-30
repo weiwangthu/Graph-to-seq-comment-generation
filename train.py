@@ -25,6 +25,7 @@ from models import *
 
 from util.nlp_utils import *
 from util.misc_utils import AverageMeter
+from util.misc_utils import load_pretrained_weight
 
 
 # config
@@ -76,6 +77,8 @@ def parse_args():
                         help="beam_search")
     parser.add_argument('-n_topic', type=int, default=5,
                         help="beam_search")
+    parser.add_argument('-load_pre', type=str, default=None,
+                        help="restore checkpoint")
 
     parser.add_argument('-log', default='', type=str,
                         help="log directory")
@@ -326,8 +329,8 @@ def eval_topic(model, train_data, epoch):
             raise Exception('nan error')
 
         # debug, for saving selected_user of each comment
-        # selected_user = result['selected_user'].tolist()
-        selected_user = result['con_sel_user'].tolist()
+        selected_user = result['selected_user'].tolist()
+        # selected_user = result['con_sel_user'].tolist()
         for bid in range(len(selected_user)):
             collect_result[selected_user[bid]].append(batch.examples[bid].ori_target)
         if sum([len(uu) for uu in collect_result]) > min(config.n_topic_num * 1000, 200000):
@@ -591,6 +594,8 @@ def main():
         model = user_autoenc_vae_bow(config, vocab, use_cuda)
     elif args.model == 'user2seq_test_new':
         model = user2seq_test_new(config, vocab, use_cuda)
+        if args.load_pre is not None:
+            load_pretrained_weight(model, os.path.join(config.log_dir, args.load_pre))
     elif args.model == 'var_select_user2seq_new':
         model = var_select_user2seq_new(config, vocab, use_cuda)
     elif args.model == 'var_select2seq_test_new':
