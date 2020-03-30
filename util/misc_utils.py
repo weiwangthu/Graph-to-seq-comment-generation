@@ -1,5 +1,6 @@
 # coding=utf-8
 import torch
+import os
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -44,3 +45,14 @@ def move_to_cuda(sample):
             setattr(sample, atr, value.cuda())
 
     return sample
+
+def load_pretrained_weight(model, checkpoint_path):
+    if not os.path.exists(checkpoint_path):
+        raise IOError('Model file not found: {}'.format(checkpoint_path))
+    pretrained_dict = torch.load(checkpoint_path)['model']
+    model_dict = model.state_dict()
+    inter_dict = dict([ (var, pretrained_dict[var]) for var in model_dict if var in pretrained_dict])
+    print('load variable from ckpt:', ','.join(inter_dict.keys()))
+    model_dict.update(inter_dict)
+    model.load_state_dict(model_dict, strict=True)
+    return model
