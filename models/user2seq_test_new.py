@@ -56,9 +56,11 @@ class GetUser(nn.Module):
             p_user = F.softmax(self.linear2(latent_context), dim=-1)  # bsz * 10
 
             if self.config.one_user:
-                p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+                g_p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+            else:
+                g_p_user = p_user
 
-            h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
+            h_user = (self.use_emb.weight.unsqueeze(0) * g_p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
             selected_user = torch.argmax(p_user, dim=-1)
         else:
             if self.topic_id == -1:
@@ -205,11 +207,15 @@ class user2seq_test_new(nn.Module):
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
         # get user
-        _, selected_user, p_user = self.get_user(z)
+        h_user, selected_user, p_user = self.get_user(z)
         content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(state[0][-1])
+        if self.config.use_post:
+            user = h_user
+        else:
+            user = content_h_user
 
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, None, content_h_user)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, None, user)
 
         dec_hidden = torch.log(torch.softmax(- self.dec_linear1(z), dim=-1) + 0.0001)
 
