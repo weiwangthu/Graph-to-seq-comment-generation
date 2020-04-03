@@ -270,8 +270,8 @@ class var_select_user2seq_new(nn.Module):
             # context_gates = context_gates[:, :, 0]
 
             # best
-            context_gates[context_gates > 0.5] = 1.0
-            context_gates[context_gates <= 0.5] = 0.0
+            context_gates[context_gates > self.config.gate_prob] = 1.0
+            context_gates[context_gates <= self.config.gate_prob] = 0.0
 
             post_context_gates = context_gates
 

@@ -79,6 +79,8 @@ def parse_args():
                         help="beam_search")
     parser.add_argument('-load_pre', type=str, default=None,
                         help="restore checkpoint")
+    parser.add_argument('-gate_prob', type=float, default=0.5,
+                        help="beam_search")
 
     parser.add_argument('-log', default='', type=str,
                         help="log directory")
@@ -596,8 +598,6 @@ def main():
         model = user_autoenc_vae_bow(config, vocab, use_cuda)
     elif args.model == 'user2seq_test_new':
         model = user2seq_test_new(config, vocab, use_cuda)
-        if args.load_pre is not None:
-            load_pretrained_weight(model, os.path.join(config.log_dir, args.load_pre))
     elif args.model == 'var_select_user2seq_new':
         model = var_select_user2seq_new(config, vocab, use_cuda)
     elif args.model == 'var_select2seq_test_new':
@@ -613,6 +613,9 @@ def main():
     for param in model.parameters():
         param_count += param.view(-1).size()[0]
     logging('total number of parameters: %d\n\n' % param_count)
+
+    if args.load_pre is not None:
+        load_pretrained_weight(model, os.path.join(config.log_dir, args.load_pre))
 
     # load best or last checkpoint
     if args.restore:
