@@ -350,9 +350,13 @@ class var_select_user2seq_new(nn.Module):
         if use_cuda:
             batch = move_to_cuda(batch)
         contexts, enc_state, z, kld, post_context_gates, comment_rep, kld_select, context_gates = self.encode(batch, True)
+        content_len, content_mask = batch.title_content_len, batch.title_content_mask
 
         # get user
-        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(enc_state[0][-1], True)
+        gate_mask = (post_context_gates > 0.5) & content_mask
+        gate_len = gate_mask.float().sum(dim=-1) + 1
+        init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
+        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state, True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
