@@ -48,15 +48,31 @@ class GetUser(nn.Module):
         self.topic_id = -1
         self.config = config
 
-    def content_to_user(self, latent_context):
-        latent_context = F.tanh(self.content_linear1(latent_context))
-        p_user = F.softmax(self.content_linear2(latent_context), dim=-1)  # bsz * 10
+    def content_to_user(self, latent_context, is_test=False):
+        if not is_test:
+            latent_context = F.tanh(self.content_linear1(latent_context))
+            p_user = F.softmax(self.content_linear2(latent_context), dim=-1)  # bsz * 10
 
-        if self.config.con_one_user:
-            p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+            if self.config.con_one_user:
+                g_p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+            else:
+                g_p_user = p_user
 
-        h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
-        selected_user = torch.argmax(p_user, dim=-1)
+            h_user = (self.use_emb.weight.unsqueeze(0) * g_p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
+            selected_user = torch.argmax(p_user, dim=-1)
+        else:
+            latent_context = F.tanh(self.content_linear1(latent_context))
+            p_user = F.softmax(self.content_linear2(latent_context), dim=-1)  # bsz * 10
+
+            values, indices = p_user.topk(5, dim=-1, largest=True, sorted=True)
+
+            if self.topic_id == -1:
+                ids = torch.LongTensor(latent_context.size(0), 1).to(latent_context.device).random_(0, self.use_emb.weight.size(0))
+            else:
+                ids = torch.LongTensor(latent_context.size(0), 1).to(latent_context.device).fill_(self.topic_id)
+            org_ids = indices.gather(dim=-1, index=ids).squeeze(dim=1)
+            h_user = self.use_emb(org_ids)
+            selected_user = org_ids
         return h_user, selected_user, p_user
 
     def forward(self, latent_context, is_test=False):
@@ -65,9 +81,11 @@ class GetUser(nn.Module):
             p_user = F.softmax(self.linear2(latent_context), dim=-1)  # bsz * 10
 
             if self.config.one_user:
-                p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+                g_p_user = gumbel_softmax(torch.log(p_user + 1e-10), self.config.tau)
+            else:
+                g_p_user = p_user
 
-            h_user = (self.use_emb.weight.unsqueeze(0) * p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
+            h_user = (self.use_emb.weight.unsqueeze(0) * g_p_user.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
             selected_user = torch.argmax(p_user, dim=-1)
         else:
             if self.topic_id == -1:
@@ -109,6 +127,7 @@ class var_select_user2seq_new(nn.Module):
         self.hidden_to_logvar = nn.Linear(config.decoder_hidden_size, config.n_z)
         self.gama_kld = config.gama_kld
         self.gama_select = config.gama_select
+        self.gama_con_select = config.gama_con_select
 
         # select gate
         self.select_gate = SelectGate(config)
@@ -133,12 +152,20 @@ class var_select_user2seq_new(nn.Module):
         reg_loss = out_dict['reg']
 
         p_user = out_dict['p_user']
-        select_entropy = p_user * torch.log(p_user + 1e-20)
-        select_entropy = select_entropy.sum(dim=1).mean()
+        # select_entropy = p_user * torch.log(p_user + 1e-20)
+        # select_entropy = select_entropy.sum(dim=1).mean()
+        batch_p_user = p_user.mean(dim=0)
+        select_entropy = batch_p_user * torch.log(batch_p_user + 1e-20)
+        select_entropy = select_entropy.sum()
 
         con_p_user = out_dict['con_p_user']
-        con_select_entropy = con_p_user * torch.log(con_p_user + 1e-20)
-        con_select_entropy = con_select_entropy.sum(dim=1).mean()
+        # uniform = torch.ones_like(con_p_user) / con_p_user.size(-1)
+        # con_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / uniform)
+        # con_select_entropy = con_select_entropy.sum(dim=1).mean()
+        batch_con_p_user = con_p_user.mean(dim=0)
+        uniform = torch.ones_like(batch_con_p_user) / batch_con_p_user.size(-1)
+        con_select_entropy = batch_con_p_user * torch.log((batch_con_p_user + 1e-20) / uniform)
+        con_select_entropy = con_select_entropy.sum()
 
         loss = word_loss[0] + self.config.gama_reg * reg_loss + self.config.gama_bow * bow_word_loss + self.gama_kld * kld + self.gama_select * select_entropy
 
@@ -147,7 +174,16 @@ class var_select_user2seq_new(nn.Module):
         join_select_entropy = con_p_user * torch.log((con_p_user + 1e-20) / (p_user_label + 1e-20))
         join_select_entropy = join_select_entropy.sum(dim=1).mean()
 
-        loss += self.gama_select * join_select_entropy
+        opt_loss = 0
+        if self.config.opt_join:
+            opt_loss = join_select_entropy
+        if self.config.opt_con:
+            opt_loss = con_select_entropy
+
+        if self.config.topic_min_select > 0:
+            opt_loss = torch.abs(opt_loss - self.config.topic_min_select)
+
+        loss += self.gama_con_select * opt_loss
 
         # gate loss
         gate_loss = out_dict['l1_gates']
@@ -250,11 +286,19 @@ class var_select_user2seq_new(nn.Module):
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
         # get user
-        _, selected_user, p_user = self.get_user(z)
-        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(state[0][-1])
+        h_user, selected_user, p_user = self.get_user(z)
+
+        gate_mask = (post_context_gates > 0.5) & content_mask
+        gate_len = gate_mask.float().sum(dim=-1) + 1
+        init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
+        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state)
+        if self.config.use_post:
+            user = h_user
+        else:
+            user = content_h_user
 
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, content_h_user)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, user)
 
         dec_hidden = torch.log(torch.softmax(- self.dec_linear1(z), dim=-1) + 0.0001)
 
@@ -308,7 +352,7 @@ class var_select_user2seq_new(nn.Module):
         contexts, enc_state, z, kld, post_context_gates, comment_rep, kld_select, context_gates = self.encode(batch, True)
 
         # get user
-        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(enc_state[0][-1])
+        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(enc_state[0][-1], True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
