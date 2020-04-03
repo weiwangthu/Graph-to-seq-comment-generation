@@ -25,6 +25,21 @@ class LatentMap(nn.Module):
         topics = torch.stack(topics, 1)
         return topics
 
+class GetUser:
+
+    def __init__(self, config):
+        self.topic_id = -1
+        self.config = config
+
+    def forward(self, topics):
+        if self.topic_id == -1:
+            ids = torch.LongTensor(topics.size(0), 1, topics.size(-1)).to(topics.device).random_(0, topics.size(-1))
+        else:
+            ids = torch.LongTensor(topics.size(0), 1, topics.size(-1)).to(topics.device).fill_(self.topic_id)
+        h_user = topics.gather(dim=1, index=ids).squeeze(dim=1)
+        selected_user = ids
+        return h_user, selected_user
+
 class user2seq_expand(nn.Module):
 
     def __init__(self, config, vocab, use_cuda, use_content=False, pretrain=None):
@@ -46,6 +61,8 @@ class user2seq_expand(nn.Module):
         # select gate
         self.comment_encoder = models.rnn_encoder(config, self.vocab_size, embedding=self.embedding)
         self.map_to_latent = LatentMap(config)
+
+        self.get_user = GetUser(config)
 
     def compute_loss(self, out_dict, targets):
         hidden_outputs = out_dict['outputs'].transpose(0, 1)
@@ -136,7 +153,10 @@ class user2seq_expand(nn.Module):
         if use_cuda:
             batch = move_to_cuda(batch)
         contexts, enc_state, comment_rep = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
+
+        # map to multi topic
+        topics = self.map_to_latent(enc_state[0][-1])
+        h_user, _ = self.get_user.forward(topics)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
