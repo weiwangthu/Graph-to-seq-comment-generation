@@ -51,6 +51,21 @@ class LatentMap(nn.Module):
         return topics
 
 
+class GetUser:
+
+    def __init__(self, config):
+        self.topic_id = -1
+        self.config = config
+
+    def forward(self, topics):
+        if self.topic_id == -1:
+            ids = torch.LongTensor(topics.size(0), 1, topics.size(-1)).to(topics.device).random_(0, topics.size(-1))
+        else:
+            ids = torch.LongTensor(topics.size(0), 1, topics.size(-1)).to(topics.device).fill_(self.topic_id)
+        h_user = topics.gather(dim=1, index=ids).squeeze(dim=1)
+        selected_user = ids
+        return h_user, selected_user
+
 class var_select_expand_user2seq(nn.Module):
 
     def __init__(self, config, vocab, use_cuda, use_content=False, pretrain=None):
@@ -72,6 +87,8 @@ class var_select_expand_user2seq(nn.Module):
         # select gate
         self.comment_encoder = models.rnn_encoder(config, self.vocab_size, embedding=self.embedding)
         self.map_to_latent = LatentMap(config)
+
+        self.get_user = GetUser(config)
 
         self.select_gate = SelectGate(config)
         self.select_post_gate = PostSelectGate(config)
@@ -148,8 +165,8 @@ class var_select_expand_user2seq(nn.Module):
             # context_gates = context_gates[:, :, 0]
 
             # best
-            context_gates[context_gates > 0.5] = 1.0
-            context_gates[context_gates <= 0.5] = 0.0
+            context_gates[context_gates > self.config.gate_prob] = 1.0
+            context_gates[context_gates <= self.config.gate_prob] = 0.0
 
             post_context_gates = context_gates
 
@@ -219,7 +236,14 @@ class var_select_expand_user2seq(nn.Module):
         if use_cuda:
             batch = move_to_cuda(batch)
         contexts, enc_state, context_gates, comment_rep, _, _ = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
+        content_len, content_mask = batch.title_content_len, batch.title_content_mask
+
+        # map to multi topic
+        gate_mask = (context_gates > 0.5) & content_mask
+        gate_len = gate_mask.float().sum(dim=-1) + 1
+        init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
+        topics = self.map_to_latent(init_state)  # output: bsz * n_topic * n_hidden
+        h_user, _ = self.get_user.forward(topics)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
