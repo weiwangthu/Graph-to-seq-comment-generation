@@ -132,7 +132,9 @@ class var_select_expand_user2seq(nn.Module):
 
         # select important information of body
         org_context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
-        context_gates = org_context_gates[:, :, 0]  # bsz * n_context
+        context_gates = gumbel_softmax(torch.log(org_context_gates + 1e-10), self.config.tau)
+        context_gates = context_gates[:, :, 0]  # bsz * n_context
+        org_context_gates = org_context_gates[:, :, 0]  # bsz * n_context
 
         if not is_test:
             # comment encoder
@@ -151,7 +153,7 @@ class var_select_expand_user2seq(nn.Module):
                 kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
                 return kl
 
-            kld_select = ((kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
+            kld_select = ((kldiv(org_post_context_gates, org_context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
 
         else:
             comment_rep = None
@@ -165,10 +167,11 @@ class var_select_expand_user2seq(nn.Module):
             # context_gates = context_gates[:, :, 0]
 
             # best
-            context_gates[context_gates > self.config.gate_prob] = 1.0
-            context_gates[context_gates <= self.config.gate_prob] = 0.0
+            org_context_gates[org_context_gates > self.config.gate_prob] = 1.0
+            org_context_gates[org_context_gates <= self.config.gate_prob] = 0.0
 
-            post_context_gates = context_gates
+            post_context_gates = org_context_gates
+            context_gates = org_context_gates
 
         return contexts, state, post_context_gates, comment_rep, kld_select, context_gates
 
@@ -186,8 +189,12 @@ class var_select_expand_user2seq(nn.Module):
         content_len, content_mask = batch.title_content_len, batch.title_content_mask
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
+        if self.config.use_post:
+            gates = post_context_gates
+        else:
+            gates = context_gates
         # map to multi topic
-        gate_mask = (post_context_gates > 0.5) & content_mask
+        gate_mask = (gates > 0.5) & content_mask
         gate_len = gate_mask.float().sum(dim=-1) + 1
         init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
         topics = self.map_to_latent(init_state)  # output: bsz * n_topic * n_hidden
@@ -198,7 +205,7 @@ class var_select_expand_user2seq(nn.Module):
         select_topic = (topics * topic_gates.unsqueeze(-1)).sum(dim=1)  # bsz * n_hidden
 
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, select_topic)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, gates, select_topic)
 
         # match loss
         news_rep = state[0][-1]
