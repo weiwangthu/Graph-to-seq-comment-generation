@@ -147,7 +147,7 @@ class var_select2seq_test(nn.Module):
         content_len, content_mask = batch.title_content_len, batch.title_content_mask
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
-        if self.config.use_post:
+        if self.config.use_post_gate:
             gates = post_context_gates
         else:
             gates = context_gates

@@ -92,7 +92,9 @@ class var_select2seq_test_new(nn.Module):
 
         # select important information of body
         org_context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
-        context_gates = org_context_gates[:, :, 0]  # bsz * n_context
+        context_gates = gumbel_softmax(torch.log(org_context_gates + 1e-10), self.config.tau)
+        context_gates = context_gates[:, :, 0]  # bsz * n_context
+        org_context_gates = org_context_gates[:, :, 0]  # bsz * n_context
 
         if not is_test:
             # comment encoder
@@ -112,7 +114,7 @@ class var_select2seq_test_new(nn.Module):
                 kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
                 return kl
 
-            kld_select = ((kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
+            kld_select = ((kldiv(org_post_context_gates, org_context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
 
         else:
             comment_rep = None
@@ -126,10 +128,11 @@ class var_select2seq_test_new(nn.Module):
             # context_gates = context_gates[:, :, 0]
 
             # best
-            context_gates[context_gates > self.config.gate_prob] = 1.0
-            context_gates[context_gates <= self.config.gate_prob] = 0.0
+            org_context_gates[org_context_gates > self.config.gate_prob] = 1.0
+            org_context_gates[org_context_gates <= self.config.gate_prob] = 0.0
 
-            post_context_gates = context_gates
+            post_context_gates = org_context_gates
+            context_gates = org_context_gates
 
         return contexts, state, post_context_gates, comment_rep, kld_select, context_gates
 
@@ -141,8 +144,12 @@ class var_select2seq_test_new(nn.Module):
         content_len, content_mask = batch.title_content_len, batch.title_content_mask
         tgt, tgt_len = batch.tgt, batch.tgt_len
 
+        if self.config.use_post_gate:
+            gates = post_context_gates
+        else:
+            gates = context_gates
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, gates)
 
         l1_gates = (post_context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
         pri_gates = (context_gates * content_mask.float()).sum(dim=-1) / content_len.float()

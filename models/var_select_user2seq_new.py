@@ -222,7 +222,9 @@ class var_select_user2seq_new(nn.Module):
 
         # select important information of body
         org_context_gates = self.select_gate(contexts)  # output: bsz * n_context * 2
-        context_gates = org_context_gates[:, :, 0]  # bsz * n_context
+        context_gates = gumbel_softmax(torch.log(org_context_gates + 1e-10), self.config.tau)
+        context_gates = context_gates[:, :, 0]  # bsz * n_context
+        org_context_gates = org_context_gates[:, :, 0]  # bsz * n_context
 
         if not is_test:
             # comment encoder
@@ -253,7 +255,7 @@ class var_select_user2seq_new(nn.Module):
                 kl = p1 * torch.log((p1 + 1e-10) / (p2 + 1e-10)) + (1 - p1) * torch.log((1 - p1 + 1e-10) / (1 - p2 + 1e-10))
                 return kl
 
-            kld_select = ((kldiv(org_post_context_gates, context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
+            kld_select = ((kldiv(org_post_context_gates, org_context_gates) * content_mask.float()).sum(dim=-1) / content_len.float()).mean()
 
         else:
             z = torch.randn([batch.title_content.size(0), self.config.n_z]).to(batch.title_content.device)
@@ -270,10 +272,11 @@ class var_select_user2seq_new(nn.Module):
             # context_gates = context_gates[:, :, 0]
 
             # best
-            context_gates[context_gates > self.config.gate_prob] = 1.0
-            context_gates[context_gates <= self.config.gate_prob] = 0.0
+            org_context_gates[org_context_gates > self.config.gate_prob] = 1.0
+            org_context_gates[org_context_gates <= self.config.gate_prob] = 0.0
 
-            post_context_gates = context_gates
+            post_context_gates = org_context_gates
+            context_gates = org_context_gates
 
         return contexts, state, z, kld, post_context_gates, comment_rep, kld_select, context_gates
 
@@ -288,17 +291,21 @@ class var_select_user2seq_new(nn.Module):
         # get user
         h_user, selected_user, p_user = self.get_user(z)
 
-        gate_mask = (post_context_gates > 0.5) & content_mask
+        if self.config.use_post_gate:
+            gates = post_context_gates
+        else:
+            gates = context_gates
+        gate_mask = (gates > 0.5) & content_mask
         gate_len = gate_mask.float().sum(dim=-1) + 1
         init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
         content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state)
-        if self.config.use_post:
+        if self.config.use_post_user:
             user = h_user
         else:
             user = content_h_user
 
         # decoder
-        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, post_context_gates, user)
+        outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts, gates, user)
 
         dec_hidden = torch.log(torch.softmax(- self.dec_linear1(z), dim=-1) + 0.0001)
 
