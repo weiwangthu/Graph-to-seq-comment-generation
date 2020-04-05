@@ -136,7 +136,9 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama_con_select', type=float, default=0.0, metavar='N',
                        help='save a checkpoint every N epochs')
-    group.add_argument('-use_post', default=False, action="store_true",
+    group.add_argument('-use_post_user', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-use_post_gate', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
@@ -663,7 +665,7 @@ def main():
         assert args.restore is not None
         test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug, args.train_num)
         if args.topic:
-            utils.write_embedding(model.get_user.use_emb.weight.detach().cpu().numpy(), log_path, epoch)
+            # utils.write_embedding(model.get_user.use_emb.weight.detach().cpu().numpy(), log_path, epoch)
             eval_bleu_with_topic(model, vocab, test_data, epoch, updates)
         else:
             eval_bleu(model, vocab, test_data, epoch, updates)

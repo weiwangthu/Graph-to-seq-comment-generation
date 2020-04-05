@@ -45,8 +45,9 @@ opt_join: False
 opt_con: False
 topic_min_select: 0.0
 gama_con_select: 0.0
-use_post: False
+use_post_user: False
 gate_prob: 0.5
+use_post_gate: False
 
 # optimize
 epoch: 40
