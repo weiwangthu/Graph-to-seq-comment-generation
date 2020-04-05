@@ -82,20 +82,20 @@ class var_select2seq_align(nn.Module):
 
     def encode(self, batch, is_test=False):
         src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
-        # content, content_len, content_mask = batch.content, batch.cotent_len, batch.cotent_mask
-        content, content_len, content_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
+        content, content_len, content_mask = batch.content, batch.content_len, batch.content_mask
+        # content, content_len, content_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
 
         # input: title, content
-        # title_contexts, title_state = self.title_encoder(src, src_len)
-        # title_rep = title_state[0][-1]  # bsz * n_hidden
+        title_contexts, title_state = self.title_encoder(src, src_len)
+        title_rep = title_state[0][-1]  # bsz * n_hidden
 
         # encoder
         contexts, state = self.encoder(content, content_len)
         local_contexts = torch.split(contexts, self.config.content_span, dim=1)
         local_vectors = self.merge_local_context(local_contexts)
 
-        new_rep = state[0][-1]
-        converted_new_rep = self.select_gate(new_rep)
+        # new_rep = state[0][-1]
+        converted_new_rep = self.select_gate(title_rep)
         org_local_scores = self.topic_attention(converted_new_rep, local_vectors)
         local_scores = gumbel_softmax(torch.log(org_local_scores), self.config.tau)  # bsz * n_topic
         context_gates = local_scores.unsqueeze(dim=-1).expand(-1, -1, self.config.content_span)
@@ -121,8 +121,13 @@ class var_select2seq_align(nn.Module):
             comment_rep = None
             post_context_gates = context_gates
             kld_select = 0
+        # collect title and body
+        one_gates = torch.ones_like(title_contexts[:,:,0])
+        all_contexts = torch.cat([title_contexts, contexts], dim=1)
+        all_post_context_gates = torch.cat([one_gates, post_context_gates], dim=1)
+        all_context_gates = torch.cat([one_gates, context_gates], dim=1)
 
-        return contexts, state, post_context_gates, comment_rep, kld_select, context_gates, converted_new_rep
+        return all_contexts, state, all_post_context_gates, comment_rep, kld_select, all_context_gates, converted_new_rep
 
     def forward(self, batch, use_cuda):
         if use_cuda:
