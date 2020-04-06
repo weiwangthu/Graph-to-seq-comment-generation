@@ -1,8 +1,10 @@
 # data
+dataset_name: 'tencent'
 train_file: './ft_local/data-with-body/data.train.json'
 valid_file: './ft_local/data-with-body/data.dev.json'
 test_file: './ft_local/data-with-body/data.test.json'
 vocab_file: './ft_local/data-with-body/vocab.txt'
+max_comment_num: 5
 vocab_size: 30000
 
 # model

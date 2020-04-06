@@ -1,0 +1,78 @@
+# data
+dataset_name: 'tencent'
+train_file: './ft_local/data-with-body/data.train.json'
+valid_file: './ft_local/data-with-body/data.dev.json'
+test_file: './ft_local/data-with-body/data.test.json'
+vocab_file: './ft_local/data-with-body/vocab.txt'
+max_comment_num: 100
+vocab_size: 30000
+
+# model
+emb_size: 256
+encoder_hidden_size: 128
+decoder_hidden_size: 256
+num_layers: 2
+bidirec: True
+shared_vocab: True
+max_tgt_len: 50
+max_article_len: 600
+dropout: 0.1
+embedding_dropout: 0.5
+drop_dec_input: False
+
+# bow
+type_num: 4
+head_num: 4
+
+# select
+tau: 0.5
+#tau: 1.0
+gama1: 0.0
+gama_kld_select: 0.0
+#gama1: 0.5
+#gama_kld: 0.0
+gama_kld: 0.05
+#gama_select: 0.0
+gama_select: 0.4
+gama_rank: 1.0
+gama_reg: 1.0
+gama_bow: 1.0
+n_z: 64
+min_select: 0.0
+#n_user:
+one_user: False
+con_one_user: False
+n_topic_num: 10
+opt_join: False
+opt_con: False
+topic_min_select: 0.0
+gama_con_select: 0.0
+use_post_user: False
+gate_prob: 0.5
+use_post_gate: False
+content_span: 20
+debug_select: False
+
+# optimize
+epoch: 40
+batch_size: 128
+param_init: 0.01
+optim: 'adam'
+learning_rate: 0.0005
+max_grad_norm: 8
+window_size: [1,2,3]
+filter_size: 128
+learning_rate_decay: 0.5
+schedule: True
+start_decay_at: 2
+
+# log
+log_dir: './log_tencent/'
+print_interval: 1000
+eval_interval: 10000
+save_interval: 10000
+metric: ['bleu', 'xent']
+
+# generate
+max_generator_batches: 32
+beam_size: 5
