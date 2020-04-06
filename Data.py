@@ -18,7 +18,7 @@ BUFSIZE = 4096000
 MAX_ARTICLE_LENGTH = 600
 MAX_TITLE_LENGTH = 30
 MAX_COMMENT_LENGTH = 50
-MAX_COMMENT_NUM = 5
+# MAX_COMMENT_NUM = 5
 
 
 class Vocab:
@@ -228,9 +228,10 @@ class Batch:
 
 
 class DataLoader:
-    def __init__(self, filename, batch_size, vocab, adj_type, use_gnn, model, is_train=True, debug=False, train_num=0):
-        self.batch_size = batch_size
+    def __init__(self, filename, config, vocab, adj_type, use_gnn, model, is_train=True, debug=False, train_num=0):
+        self.batch_size = config.batch_size if is_train else config.max_generator_batches
         self.vocab = vocab
+        self.config = config
         # self.max_len = MAX_LENGTH
         self.filename = filename
         self.stream = open(self.filename, encoding='utf8')
@@ -243,6 +244,11 @@ class DataLoader:
         self.adj_type = adj_type
         self.use_gnn = use_gnn
         self.model = model
+
+        if self.config.dataset_name == 'yahoo':
+            self.create_comments_from_article = lambda x: self.create_comments_from_yahoo_article(x)
+        else:
+            self.create_comments_from_article = lambda x: self.create_comments_from_tencent_article(x)
 
     def __iter__(self):
         lines = self.stream.readlines()
@@ -278,7 +284,7 @@ class DataLoader:
             yield Batch(example_list, self.is_train, self.model)
             idx += self.batch_size
 
-    def create_comments_from_article(self, article):
+    def create_comments_from_tencent_article(self, article):
         comments = []
         if self.is_train:
             for i in range(len(article['comment'])):
@@ -288,11 +294,33 @@ class DataLoader:
                 item['comment'] = article['comment'][i][0]
                 comments.append(item)
 
-                if len(comments) >= MAX_COMMENT_NUM:
+                if 0 < self.config.max_comment_num <= len(comments):
                     break
         else:
             # contain one article and multi comments
             article['comment'] = article['comment'][:5]
+            comments.append(article)
+        return comments
+
+    def create_comments_from_yahoo_article(self, article):
+        comments = []
+        if self.is_train:
+            for i in range(len(article['cmts'])):
+                item = dict()
+                item['title'] = article['title']
+                item['body'] = ' '.join(article['paras'])
+                item['comment'] = article['cmts'][i]['cmt']
+                comments.append(item)
+
+                if 0 < self.config.max_comment_num <= len(comments):
+                    break
+        else:
+            # contain one article and multi comments
+            item = dict()
+            item['id'] = article['_id']
+            item['title'] = article['title']
+            item['body'] = ' '.join(article['paras'])
+            item['comment'] = [c['cmt'] for c in article['cmts'][:5]]
             comments.append(article)
         return comments
 

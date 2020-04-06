@@ -565,8 +565,8 @@ def main():
     use_gnn = False
     if args.graph_model == 'GNN':
         use_gnn = True
-    train_data = DataLoader(config.train_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num)
-    valid_data = DataLoader(config.valid_file, config.batch_size, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num)
+    train_data = DataLoader(config.train_file, config, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num)
+    valid_data = DataLoader(config.valid_file, config, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num)
 
     # model
     print('building model...\n')
@@ -691,7 +691,7 @@ def main():
             eval_topic(model, train_data, epoch)
     else:
         assert args.restore is not None
-        test_data = DataLoader(config.test_file, config.max_generator_batches, vocab, args.adj, use_gnn, args.model, False, args.debug, args.train_num)
+        test_data = DataLoader(config.test_file, config, vocab, args.adj, use_gnn, args.model, False, args.debug, args.train_num)
         if args.topic:
             # utils.write_embedding(model.get_user.use_emb.weight.detach().cpu().numpy(), log_path, epoch)
             eval_bleu_with_topic(model, vocab, test_data, epoch, updates)
