@@ -49,6 +49,7 @@ use_post_user: False
 gate_prob: 0.5
 use_post_gate: False
 content_span: 20
+debug_select: False
 
 # optimize
 epoch: 40

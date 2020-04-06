@@ -50,7 +50,8 @@ def parse_args():
                                  'autoenc_lm', 'autoenc_vae', 'autoenc_vae_bow', 'autoenc_vae_cat',
                                  'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm',
                                  'user2seq_test_new', 'var_select_user2seq_new', 'var_select2seq_test_new',
-                                 'user2seq_expand', 'var_select_expand_user2seq'
+                                 'user2seq_expand', 'var_select_expand_user2seq',
+                                 'var_select2seq_align'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -81,6 +82,8 @@ def parse_args():
                         help="restore checkpoint")
     parser.add_argument('-gate_prob', type=float, default=0.5,
                         help="beam_search")
+    parser.add_argument('-debug_select', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
 
     parser.add_argument('-log', default='', type=str,
                         help="log directory")
@@ -140,6 +143,8 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-use_post_gate', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
+    group.add_argument('-dynamic_tau', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
@@ -188,6 +193,8 @@ use_cuda = torch.cuda.is_available()
 def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, updates, org_best_score=None):
     scores = []
     best_score = org_best_score if org_best_score is not None else 10000.
+    tau = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
+    tau += [0.05] * 30
     for epoch in range(org_epoch + 1, org_epoch + config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
@@ -215,6 +222,8 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 model.gama_select = max(config.gama_select, 1 - updates/(15000.0 * args.mid_max))
             if args.dynamic4:
                 model.gama_con_select = max(config.gama_con_select, 1 - updates/(15000.0 * args.mid_max))
+            if args.dynamic_tau:
+                model.config.tau = tau[epoch]
 
             # with autograd.detect_anomaly():
             model.zero_grad()
@@ -378,12 +387,16 @@ def eval_topic(model, train_data, epoch):
 def eval_bleu(model, vocab, valid_data, epoch, updates):
     model.eval()
     multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
+    select_content = []
 
     for batch in tqdm(valid_data, disable=not args.verbose):
         if len(args.gpus) > 1 or not args.beam_search:
             samples, alignment = model.sample(batch, use_cuda)
         else:
-            samples, alignment = model.beam_sample(batch, use_cuda, beam_size=config.beam_size, n_best=args.n_best)
+            result = model.beam_sample(batch, use_cuda, beam_size=config.beam_size, n_best=args.n_best)
+            samples, alignment = result[0], result[1]
+            if config.debug_select:
+                select_words = result[2]
         '''
         if i == 0:
             print(batch.examples[27].ori_title)
@@ -395,7 +408,11 @@ def eval_bleu(model, vocab, valid_data, epoch, updates):
         source += [example for example in batch.examples]
         # reference += [example.ori_target for example in batch.examples]
         multi_ref += [example.ori_targets for example in batch.examples]
+        if config.debug_select:
+            select_content += [vocab.id2sent(s) for s in select_words]
     utils.write_multi_result_to_file(source, candidate, log_path, epoch)
+    if config.debug_select:
+        utils.write_topic_result_to_file(source, select_content, log_path, epoch, 0, data_type='beam.swords')
 
     # bleu, best 1
     single_candidate = [c[0] for c in candidate]
@@ -422,6 +439,7 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
     multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
 
     candidate = [[] for _ in range(args.n_topic)]
+    select_content = [[] for _ in range(args.n_topic)]
     for i in range(args.n_topic):
         print('decode topic %d' % i)
         for batch in tqdm(valid_data, disable=not args.verbose):
@@ -429,7 +447,10 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
             if len(args.gpus) > 1 or not args.beam_search:
                 samples, alignment = model.sample(batch, use_cuda)
             else:
-                samples, alignment = model.beam_sample(batch, use_cuda, beam_size=config.beam_size)
+                result = model.beam_sample(batch, use_cuda, beam_size=config.beam_size)
+                samples, alignment = result[0], result[1]
+                if config.debug_select:
+                    select_words = result[2]
             '''
             if i == 0:
                 print(batch.examples[27].ori_title)
@@ -446,8 +467,13 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
             else:
                 candidate[i] += [vocab.id2sent(s[0]) for s in samples]
 
+            if config.debug_select:
+                select_content[i] += [vocab.id2sent(s) for s in select_words]
         # save to file
         utils.write_topic_result_to_file(source, candidate[i], log_path, epoch, i)
+
+        if config.debug_select:
+            utils.write_topic_result_to_file(source, select_content[i], log_path, epoch, i, data_type='topic.swords')
 
     # bleu, best 1
     text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate[0], log_path)
@@ -608,6 +634,8 @@ def main():
         model = user2seq_expand(config, vocab, use_cuda)
     elif args.model == 'var_select_expand_user2seq':
         model = var_select_expand_user2seq(config, vocab, use_cuda)
+    elif args.model == 'var_select2seq_align':
+        model = var_select2seq_align(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")

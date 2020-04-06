@@ -184,12 +184,12 @@ def write_multi_result_to_file(examples, candidates, log_path, epoch):
             f.write("\n")
 
 
-def write_topic_result_to_file(examples, candidates, log_path, epoch, topic):
+def write_topic_result_to_file(examples, candidates, log_path, epoch, topic, data_type='topic'):
     assert len(examples) == len(candidates), (len(examples), len(candidates))
     if not os.path.exists(log_path):
         os.mkdir(log_path)
     log_path = log_path.strip('/')
-    log_file = log_path + '/result_for_test.tsv.topic.%d.%d' % (epoch, topic)
+    log_file = log_path + '/result_for_test.tsv.%s.%d.%d' % (data_type, epoch, topic)
     with codecs.open(log_file, 'w', 'utf-8') as f:
         for e, cand in zip(examples, candidates):
             f.write(str(e.ori_news_id) + '\t')
