@@ -51,7 +51,7 @@ def parse_args():
                                  'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm',
                                  'user2seq_test_new', 'var_select_user2seq_new', 'var_select2seq_test_new',
                                  'user2seq_expand', 'var_select_expand_user2seq',
-                                 'var_select2seq_align'
+                                 'var_select2seq_align', 'var_select2seq_test_span'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -144,6 +144,8 @@ def parse_args():
     group.add_argument('-use_post_gate', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
     group.add_argument('-dynamic_tau', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-content_span', type=int, default=20, metavar='N',
                        help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
@@ -636,6 +638,8 @@ def main():
         model = var_select_expand_user2seq(config, vocab, use_cuda)
     elif args.model == 'var_select2seq_align':
         model = var_select2seq_align(config, vocab, use_cuda)
+    elif args.model == 'var_select2seq_test_span':
+        model = var_select2seq_test_span(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
