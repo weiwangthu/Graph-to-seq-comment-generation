@@ -70,7 +70,7 @@ class var_select2seq_align(nn.Module):
     def topic_attention(self, comment, topics):
         comment = comment.unsqueeze(2)  # bsz * n_hidden * 1
         weights = torch.bmm(topics, comment).squeeze(2)  # bsz * n_topic
-        weights = F.softmax(weights, dim=-1)
+        weights = F.softmax(weights / self.config.tau, dim=-1)
         return weights
 
     def merge_local_context(self, group_vectors):
@@ -97,8 +97,8 @@ class var_select2seq_align(nn.Module):
         # new_rep = state[0][-1]
         converted_new_rep = self.select_gate(title_rep)
         org_local_scores = self.topic_attention(converted_new_rep, local_vectors)
-        local_scores = gumbel_softmax(torch.log(org_local_scores), self.config.tau)  # bsz * n_topic
-        context_gates = local_scores.unsqueeze(dim=-1).expand(-1, -1, self.config.content_span)
+        # local_scores = gumbel_softmax(torch.log(org_local_scores), self.config.tau)  # bsz * n_topic
+        context_gates = org_local_scores.unsqueeze(dim=-1).expand(-1, -1, self.config.content_span)
         context_gates = context_gates.reshape(context_gates.size(0), -1)[:, :contexts.size(1)]
 
         if not is_test:
@@ -108,8 +108,8 @@ class var_select2seq_align(nn.Module):
             comment_rep = comment_state[0][-1]  # bsz * n_hidden
 
             org_post_local_scores = self.topic_attention(comment_rep, local_vectors)
-            post_local_scores = gumbel_softmax(torch.log(org_post_local_scores), self.config.tau)  # bsz * n_topic
-            post_context_gates = post_local_scores.unsqueeze(dim=-1).expand(-1, -1, 20)
+            # post_local_scores = gumbel_softmax(torch.log(org_post_local_scores), self.config.tau)  # bsz * n_topic
+            post_context_gates = org_post_local_scores.unsqueeze(dim=-1).expand(-1, -1, 20)
             post_context_gates = post_context_gates.reshape(post_context_gates.size(0), -1)[:, :contexts.size(1)]
 
             def kld(p1, p2):
