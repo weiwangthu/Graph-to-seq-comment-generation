@@ -141,6 +141,7 @@ class var_select2seq_test_span(nn.Module):
 
             kld_select = ((kldiv(org_post_context_gates, org_context_gates) * local_vector_mask.float()).sum(dim=-1) / local_vector_mask.float().sum(dim=-1)).mean()
 
+
         else:
             comment_rep = None
             kld_select = 0.0
@@ -159,13 +160,13 @@ class var_select2seq_test_span(nn.Module):
             post_context_gates = org_context_gates
             context_gates = org_context_gates
 
+        l1_gates = (post_context_gates * local_vector_mask.float()).sum(dim=-1) / local_vector_mask.float().sum(dim=-1)
+        pri_gates = (context_gates * local_vector_mask.float()).sum(dim=-1) / local_vector_mask.float().sum(dim=-1)
+
         context_gates = context_gates.unsqueeze(dim=-1).expand(-1, -1, self.config.content_span)
         context_gates = context_gates.reshape(context_gates.size(0), -1)[:, :contexts.size(1)]
         post_context_gates = post_context_gates.unsqueeze(dim=-1).expand(-1, -1, self.config.content_span)
         post_context_gates = post_context_gates.reshape(post_context_gates.size(0), -1)[:, :contexts.size(1)]
-
-        l1_gates = (post_context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
-        pri_gates = (context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
 
         # collect title and body
         one_gates = torch.ones_like(title_contexts[:, :, 0])
