@@ -186,7 +186,10 @@ class var_select_user2seq_new(nn.Module):
         loss += self.gama_con_select * opt_loss
 
         # gate loss
-        gate_loss = out_dict['l1_gates']
+        if self.config.use_post_gate:
+            gate_loss = out_dict['l1_gates']
+        else:
+            gate_loss = out_dict['pri_gates']
 
         # kld select
         kld_select = out_dict['kld_select']
