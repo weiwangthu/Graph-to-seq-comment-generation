@@ -201,6 +201,11 @@ class var_select_user2seq_new2(nn.Module):
 
         loss += self.config.gama1 * gate_loss + self.gama_kld_select * kld_select
 
+        # rank and reg loss
+        rank_loss = out_dict['rank']
+
+        loss += self.config.gama_rank * rank_loss
+
         return {
             'loss': loss,
             'word_loss': word_loss[0],
@@ -217,6 +222,7 @@ class var_select_user2seq_new2(nn.Module):
             'gate_loss': gate_loss,
             'kld_select_loss': kld_select,
             'pri_gates': out_dict['pri_gates'],
+            'rank': rank_loss,
         }
 
     def encode(self, batch, is_test=False):
@@ -306,9 +312,9 @@ class var_select_user2seq_new2(nn.Module):
             gates = post_context_gates
         else:
             gates = context_gates
-        gate_mask = (gates > 0.5) & content_mask
-        gate_len = gate_mask.float().sum(dim=-1) + 1
-        init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
+        gate_mask_temp = gates * content_mask.float()
+        gate_len = gate_mask_temp.sum(dim=-1) + 0.00001
+        init_state = (contexts * gate_mask_temp.unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
         content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state)
         if self.config.use_post_user:
             user = h_user
@@ -323,6 +329,14 @@ class var_select_user2seq_new2(nn.Module):
         # kld loss
         # kld = torch.mean((p_user.unsqueeze(-1) * kld).sum(dim=1), 0).sum()
         kld = (p_user.unsqueeze(-1) * kld).sum(dim=1).sum(dim=1).mean()
+
+        # match loss
+        news_rep = init_state
+        # news_rep_neg = torch.roll(news_rep, 1, dims=0)
+        news_rep_neg = state[0][-1]
+
+        # user loss
+        rank_loss = (1 - torch.sum(comment_rep * news_rep, dim=-1) + torch.sum(comment_rep * news_rep_neg, dim=-1)).clamp(min=0).mean()
 
         # user loss
         identity_matrix = torch.eye(self.get_user.use_emb.weight.size(0), dtype=z.dtype, device=z.device)
@@ -348,6 +362,7 @@ class var_select_user2seq_new2(nn.Module):
             'l1_gates': l1_gates.mean(),
             'kld_select': kld_select,
             'pri_gates': pri_gates.mean(),
+            'rank': rank_loss,
         }
 
     def sample(self, batch, use_cuda):

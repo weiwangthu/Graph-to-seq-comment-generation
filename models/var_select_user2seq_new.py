@@ -298,9 +298,9 @@ class var_select_user2seq_new(nn.Module):
             gates = post_context_gates
         else:
             gates = context_gates
-        gate_mask = (gates > 0.5) & content_mask
-        gate_len = gate_mask.float().sum(dim=-1) + 1
-        init_state = (contexts * gate_mask.float().unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
+        gate_mask_temp = gates * content_mask.float()
+        gate_len = gate_mask_temp.sum(dim=-1) + 0.00001
+        init_state = (contexts * gate_mask_temp.unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
         content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state)
         if self.config.use_post_user:
             user = h_user
