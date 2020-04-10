@@ -109,7 +109,7 @@ class var_select2seq_align(nn.Module):
 
             org_post_local_scores = self.topic_attention(comment_rep, local_vectors)
             # post_local_scores = gumbel_softmax(torch.log(org_post_local_scores), self.config.tau)  # bsz * n_topic
-            post_context_gates = org_post_local_scores.unsqueeze(dim=-1).expand(-1, -1, 20)
+            post_context_gates = org_post_local_scores.unsqueeze(dim=-1).expand(-1, -1, self.config.content_span)
             post_context_gates = post_context_gates.reshape(post_context_gates.size(0), -1)[:, :contexts.size(1)]
 
             def kld(p1, p2):
