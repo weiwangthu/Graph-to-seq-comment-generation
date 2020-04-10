@@ -51,7 +51,8 @@ def parse_args():
                                  'user_autoenc_vae_bow', 'autoenc_vae_bow_norm', 'user_autoenc_vae_bow_norm',
                                  'user2seq_test_new', 'var_select_user2seq_new', 'var_select2seq_test_new',
                                  'user2seq_expand', 'var_select_expand_user2seq',
-                                 'var_select2seq_align', 'var_select2seq_test_span'
+                                 'var_select2seq_align', 'var_select2seq_test_span', 'var_select2seq_test_span2',
+                                 'var_select_user2seq_new2', 'var_select2seq_test_span3'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -196,7 +197,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
     scores = []
     best_score = org_best_score if org_best_score is not None else 10000.
     tau = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-    tau += [0.05] * 30
+    tau += [0.05] * 31
     for epoch in range(org_epoch + 1, org_epoch + config.epoch + 1):
         total_acc = 0.
         total_loss = 0.
@@ -640,6 +641,12 @@ def main():
         model = var_select2seq_align(config, vocab, use_cuda)
     elif args.model == 'var_select2seq_test_span':
         model = var_select2seq_test_span(config, vocab, use_cuda)
+    elif args.model == 'var_select2seq_test_span2':
+        model = var_select2seq_test_span2(config, vocab, use_cuda)
+    elif args.model == 'var_select_user2seq_new2':
+        model = var_select_user2seq_new2(config, vocab, use_cuda)
+    elif args.model == 'var_select2seq_test_span3':
+        model = var_select2seq_test_span3(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")

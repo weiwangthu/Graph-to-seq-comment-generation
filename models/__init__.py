@@ -38,3 +38,6 @@ from models.user2seq_expand import user2seq_expand
 from models.var_select_expand_user2seq import var_select_expand_user2seq
 from models.var_select2seq_align import var_select2seq_align
 from models.var_select2seq_test_span import var_select2seq_test_span
+from models.var_select2seq_test_span2 import var_select2seq_test_span2
+from models.var_select_user2seq_new2 import var_select_user2seq_new2
+from models.var_select2seq_test_span3 import var_select2seq_test_span3
