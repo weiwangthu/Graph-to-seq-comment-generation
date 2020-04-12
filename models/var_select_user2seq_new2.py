@@ -390,7 +390,7 @@ class var_select_user2seq_new2(nn.Module):
         gate_mask_temp = post_context_gates * content_mask.float()
         gate_len = gate_mask_temp.sum(dim=-1) + 0.00001
         init_state = (contexts * gate_mask_temp.unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
-        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state)
+        content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state, True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
@@ -462,7 +462,7 @@ class var_select_user2seq_new2(nn.Module):
         # print(allAttn)
         if self.config.debug_select:
             title_content = batch.title_content
-            title_content[org_context_gates == 0] = self.vocab.PAD_token
+            title_content[org_context_gates > 0.9] = self.vocab.PAD_token
             all_select_words = title_content
             return allHyps, allAttn, all_select_words
         else:
