@@ -55,6 +55,8 @@ use_post_gate: False
 content_span: 20
 debug_select: False
 gama_label: 0.0
+no_topk: False
+topk_num: 5
 
 # optimize
 epoch: 40

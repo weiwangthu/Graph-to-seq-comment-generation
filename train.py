@@ -151,6 +151,10 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama_label', type=float, default=0.0, metavar='N',
                        help='save a checkpoint every N epochs')
+    group.add_argument('-no_topk', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-topk_num', type=int, default=5, metavar='N',
+                       help='save a checkpoint every N epochs')
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
