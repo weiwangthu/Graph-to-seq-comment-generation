@@ -41,3 +41,4 @@ from models.var_select2seq_test_span import var_select2seq_test_span
 from models.var_select2seq_test_span2 import var_select2seq_test_span2
 from models.var_select_user2seq_new2 import var_select_user2seq_new2
 from models.var_select2seq_test_span3 import var_select2seq_test_span3
+from models.select2seq_label import select2seq_label

@@ -84,10 +84,23 @@ class Example:
         memory: tag (oov has extend ids)
     """
 
-    def __init__(self, original_content, title, target, vocab, is_train, news_id, model):
+    def __init__(self, original_content, title, target, vocab, is_train, news_id, model, content_label=None):
         self.ori_title = title[:MAX_TITLE_LENGTH]
         self.ori_original_content = original_content[:MAX_ARTICLE_LENGTH]
         self.ori_news_id = news_id
+        self.content_label = content_label
+        if content_label is not None:
+            min_title = min(len(title), MAX_TITLE_LENGTH)
+            temp = [l for l in content_label if l < min_title]
+            min_body = min(len(original_content), MAX_ARTICLE_LENGTH)
+            temp2 = [l for l in content_label if 0 <= l - len(title) < min_body]
+            if MAX_TITLE_LENGTH < len(title):
+                temp2 = [l - (len(title) - MAX_TITLE_LENGTH) for l in temp2]
+            temp = temp + temp2
+            if len(temp) == 0:
+                temp = [-1]
+            self.content_label = temp
+
         if is_train:
             self.ori_target = target[:MAX_COMMENT_LENGTH]
         else:
@@ -192,6 +205,9 @@ class Batch:
             self.tgt_len = self.get_length([e.target for e in example_list])
             self.tgt, self.tgt_mask = self.padding_list_to_tensor([e.target for e in example_list], self.tgt_len.max().item())
 
+            if example_list[0].content_label is not None:
+                self.content_label = [e.content_label for e in example_list]
+
     @staticmethod
     def get_length(examples, max_len=1000):
         length = []
@@ -232,7 +248,7 @@ class Batch:
 
 
 class DataLoader:
-    def __init__(self, filename, config, vocab, adj_type, use_gnn, model, is_train=True, debug=False, train_num=0):
+    def __init__(self, filename, config, vocab, adj_type, use_gnn, model, is_train=True, debug=False, train_num=0, extra_file=None):
         self.batch_size = config.batch_size if is_train else config.max_generator_batches
         self.vocab = vocab
         self.config = config
@@ -250,17 +266,32 @@ class DataLoader:
         self.model = model
 
         if self.config.dataset_name == 'yahoo':
-            self.create_comments_from_article = lambda x: self.create_comments_from_yahoo_article(x)
+            self.create_comments_from_article = lambda x,y: self.create_comments_from_yahoo_article(x, y)
         else:
-            self.create_comments_from_article = lambda x: self.create_comments_from_tencent_article(x)
+            self.create_comments_from_article = lambda x,y: self.create_comments_from_tencent_article(x, y)
+
+        if extra_file is not None:
+            self.extra_file = extra_file
+            self.stream_extra = open(self.extra_file, encoding='utf8')
+        else:
+            self.stream_extra = None
 
     def __iter__(self):
         lines = self.stream.readlines()
+        if self.stream_extra is not None:
+            lines_ext = self.stream_extra.readlines()
+
+        # next epoch
         if not lines:
             self.epoch_id += 1
             self.stream.close()
             self.stream = open(self.filename, encoding='utf8')
             lines = self.stream.readlines()
+
+            if self.stream_extra is not None:
+                self.stream_extra.close()
+                self.stream_extra = open(self.extra_file, encoding='utf8')
+                lines_ext = self.stream_extra.readlines()
 
         articles = []
         for line in lines:
@@ -275,10 +306,27 @@ class DataLoader:
                 if len(articles) >= self.train_num:
                     break
         # random.shuffle(articles)
+        # read extra data
+        if self.stream_extra is not None:
+            articles_ext = []
+            for line in lines_ext:
+                line = line.strip()
+                articles_ext.append(json.loads(line))
+
+                if len(articles_ext) > 100 and self.debug:
+                    break
+                if self.train_num > 0:
+                    if len(articles_ext) >= self.train_num:
+                        break
+            assert len(articles) == len(articles_ext)
 
         data = []
-        for idx, doc in enumerate(articles):
-            data.extend(self.create_comments_from_article(doc))
+        if self.stream_extra is None:
+            for idx, doc in enumerate(articles):
+                data.extend(self.create_comments_from_article(doc, None))
+        else:
+            for idx, (doc, doc_extra) in enumerate(zip(articles, articles_ext)):
+                data.extend(self.create_comments_from_article(doc, doc_extra))
         if self.is_train:
             random.shuffle(data)
 
@@ -288,7 +336,7 @@ class DataLoader:
             yield Batch(example_list, self.is_train, self.model)
             idx += self.batch_size
 
-    def create_comments_from_tencent_article(self, article):
+    def create_comments_from_tencent_article(self, article, article_ext=None):
         comments = []
         if self.is_train:
             for i in range(len(article['comment'])):
@@ -298,6 +346,9 @@ class DataLoader:
                 item['comment'] = article['comment'][i][0]
                 comments.append(item)
 
+                if article_ext is not None:
+                    item['content_label'] = article_ext['com_labels'][i]
+
                 if 0 < self.config.max_comment_num <= len(comments):
                     break
         else:
@@ -306,7 +357,7 @@ class DataLoader:
             comments.append(article)
         return comments
 
-    def create_comments_from_yahoo_article(self, article):
+    def create_comments_from_yahoo_article(self, article, article_ext=None):
         comments = []
         if self.is_train:
             for i in range(len(article['cmts'])):
@@ -315,6 +366,9 @@ class DataLoader:
                 item['body'] = ' '.join(article['paras'])
                 item['comment'] = article['cmts'][i]['cmt']
                 comments.append(item)
+
+                if article_ext is not None:
+                    item['content_label'] = article_ext['com_labels'][i]
 
                 if 0 < self.config.max_comment_num <= len(comments):
                     break
@@ -340,11 +394,11 @@ class DataLoader:
             title = g["title"].split()
             original_content = g["body"].split()
 
-            news_id = None
-            if not self.is_train:
-                news_id = g["id"]
+            content_label = g['content_label'] if 'content_label' in g else None
 
-            e = Example(original_content, title, target, self.vocab, self.is_train, news_id=news_id, model=self.model)
+            news_id = None if self.is_train else g["id"]
+
+            e = Example(original_content, title, target, self.vocab, self.is_train, news_id=news_id, model=self.model, content_label=content_label)
             results.append(e)
         return results
 

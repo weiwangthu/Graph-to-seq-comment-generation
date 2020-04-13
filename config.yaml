@@ -4,6 +4,8 @@ train_file: './ft_local/data-with-body/data.train.json'
 valid_file: './ft_local/data-with-body/data.dev.json'
 test_file: './ft_local/data-with-body/data.test.json'
 vocab_file: './ft_local/data-with-body/vocab.txt'
+train_label_file: './ft_local/data-with-body/data.train.json.ngram'
+dev_label_file: './ft_local/data-with-body/data.dev.json.ngram'
 max_comment_num: 5
 vocab_size: 30000
 
@@ -52,6 +54,7 @@ gate_prob: 0.5
 use_post_gate: False
 content_span: 20
 debug_select: False
+gama_label: 0.0
 
 # optimize
 epoch: 40
