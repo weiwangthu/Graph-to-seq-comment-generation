@@ -66,15 +66,19 @@ class GetUser(nn.Module):
             latent_context = F.tanh(self.content_linear1(latent_context))
             p_user = F.softmax(self.content_linear2(latent_context), dim=-1)  # bsz * 10
 
-            values, indices = p_user.topk(5, dim=-1, largest=True, sorted=True)
+            values, indices = p_user.topk(self.config.topk_num, dim=-1, largest=True, sorted=True)
 
             if self.topic_id == -1:
                 ids = torch.LongTensor(latent_context.size(0), 1).to(latent_context.device).random_(0, self.use_emb.weight.size(0))
             else:
                 ids = torch.LongTensor(latent_context.size(0), 1).to(latent_context.device).fill_(self.topic_id)
-            org_ids = indices.gather(dim=-1, index=ids).squeeze(dim=1)
-            h_user = self.use_emb(org_ids)
-            selected_user = org_ids
+            if not self.config.no_topk:
+                org_ids = indices.gather(dim=-1, index=ids).squeeze(dim=1)
+                h_user = self.use_emb(org_ids)
+                selected_user = org_ids
+            else:
+                h_user = self.use_emb(ids.squeeze(dim=1))
+                selected_user = ids
         return h_user, selected_user, p_user
 
     def forward(self, latent_context, is_test=False):
