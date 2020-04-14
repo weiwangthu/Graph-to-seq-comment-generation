@@ -17,7 +17,7 @@ class SelectGate(nn.Module):
 
     def forward(self, contexts, title_context):
         title_context = title_context.unsqueeze(1).expand(-1, contexts.size(1), -1)
-        gates = F.sigmoid(self.linear(torch.cat([contexts, title_context], dim=-1)), dim=-1)
+        gates = F.sigmoid(self.linear(torch.cat([contexts, title_context], dim=-1)))
         return gates
 
 
@@ -64,11 +64,12 @@ class select2seq_encode(nn.Module):
         content, content_len, content_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
 
         # input: title, content
-        title_contexts, title_state = self.title_encoder(src, src_len)
-        title_rep = title_state[0][-1]  # bsz * n_hidden
+        # title_contexts, title_state = self.title_encoder(src, src_len)
+        # title_rep = title_state[0][-1]  # bsz * n_hidden
 
         # encoder
         contexts, state = self.encoder(content, content_len)
+        title_rep = state[0][-1]
 
         # select important information of body
         context_gates = self.select_gate(contexts, title_rep)  # output: bsz * n_context * 2
@@ -87,7 +88,7 @@ class select2seq_encode(nn.Module):
         outputs, final_state, attns = self.decoder(tgt[:, :-1], state, contexts)
         # return outputs, gates, title_state[0], comment_state[0]
 
-        l1_gates = (context_gates * content_mask.float()).sum(dim=-1) / content_len.float()
+        l1_gates = (context_gates.squeeze(dim=-1) * content_mask.float()).sum(dim=-1) / content_len.float()
 
         return {
             'outputs': outputs,
