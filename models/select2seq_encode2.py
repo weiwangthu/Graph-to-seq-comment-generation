@@ -60,7 +60,7 @@ class select2seq_encode2(nn.Module):
 
     def encode(self, batch, is_test=False):
         src, src_len, src_mask = batch.title, batch.title_len, batch.title_mask
-        content, content_len, content_mask = batch.content, batch.cotent_len, batch.cotent_mask
+        content, content_len, content_mask = batch.content, batch.content_len, batch.content_mask
         # content, content_len, content_mask = batch.title_content, batch.title_content_len, batch.title_content_mask
 
         # input: title, content
