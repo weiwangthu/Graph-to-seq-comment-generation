@@ -53,7 +53,7 @@ def parse_args():
                                  'user2seq_expand', 'var_select_expand_user2seq',
                                  'var_select2seq_align', 'var_select2seq_test_span', 'var_select2seq_test_span2',
                                  'var_select_user2seq_new2', 'var_select2seq_test_span3',
-                                 'select2seq_label'
+                                 'select2seq_label', 'var_select_user2seq_label'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -656,6 +656,8 @@ def main():
         model = var_select2seq_test_span3(config, vocab, use_cuda)
     elif args.model == 'select2seq_label':
         model = select2seq_label(config, vocab, use_cuda)
+    elif args.model == 'var_select_user2seq_label':
+        model = var_select_user2seq_label(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
