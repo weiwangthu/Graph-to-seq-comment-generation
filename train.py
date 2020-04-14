@@ -53,7 +53,7 @@ def parse_args():
                                  'user2seq_expand', 'var_select_expand_user2seq',
                                  'var_select2seq_align', 'var_select2seq_test_span', 'var_select2seq_test_span2',
                                  'var_select_user2seq_new2', 'var_select2seq_test_span3',
-                                 'select2seq_label', 'var_select_user2seq_label'
+                                 'select2seq_label', 'var_select_user2seq_label', 'select2seq_encode'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -85,7 +85,15 @@ def parse_args():
     parser.add_argument('-gate_prob', type=float, default=0.5,
                         help="beam_search")
     parser.add_argument('-debug_select', default=False, action="store_true",
-                       help='save a checkpoint every N epochs')
+                        help='save a checkpoint every N epochs')
+    parser.add_argument('-topic', default=False, action="store_true",
+                        help='save a checkpoint every N epochs')
+    parser.add_argument('-no_topk', default=False, action="store_true",
+                        help='save a checkpoint every N epochs')
+    parser.add_argument('-topk_num', type=int, default=5, metavar='N',
+                        help='save a checkpoint every N epochs')
+    parser.add_argument('-topic_vec', default=False, action="store_true",
+                        help='save a checkpoint every N epochs')
 
     parser.add_argument('-log', default='', type=str,
                         help="log directory")
@@ -116,8 +124,6 @@ def parse_args():
     group.add_argument('-gama_reg', type=float, default=1.0, metavar='N',
                        help='save a checkpoint every N epochs')
     group.add_argument('-min_select', type=float, default=0.0, metavar='N',
-                       help='save a checkpoint every N epochs')
-    group.add_argument('-topic', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
     group.add_argument('-one_user', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
@@ -151,10 +157,7 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-gama_label', type=float, default=0.0, metavar='N',
                        help='save a checkpoint every N epochs')
-    group.add_argument('-no_topk', default=False, action="store_true",
-                       help='save a checkpoint every N epochs')
-    group.add_argument('-topk_num', type=int, default=5, metavar='N',
-                       help='save a checkpoint every N epochs')
+
 
     opt = parser.parse_args()
     config = util.utils.read_config(opt.config)
@@ -508,6 +511,54 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
     return bleu
 
 
+def eval_topic_vec(model, vocab, valid_data, epoch, updates):
+    model.eval()
+    multi_ref, reference, candidate, source, tags, alignments = [], [], [], [], [], []
+
+    candidate = [[] for _ in range(args.n_topic)]
+    for i in range(args.n_topic):
+        print('decode topic %d' % i)
+        for batch in tqdm(valid_data, disable=not args.verbose):
+            model.get_user.topic_id = i
+            samples = model.generate_with_topic(batch, use_cuda)
+
+            # first topic
+            if i == 0:
+                candidate[i] += [vocab.id2sent(s) for s in samples]
+                source += [example for example in batch.examples]
+                # reference += [example.ori_target for example in batch.examples]
+                multi_ref += [example.ori_targets for example in batch.examples]
+            else:
+                candidate[i] += [vocab.id2sent(s) for s in samples]
+
+            if len(candidate[i]) > 100:
+                break
+
+        # save to file
+        utils.write_topic_result_to_file(source, candidate[i], log_path, epoch, i)
+
+    # bleu, best 1
+    text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate[0], log_path)
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+
+    # distinct, best 1 and best n
+    metrics_best_1 = calc_diversity(candidate[0])
+    text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_1[key]) for key in metrics_best_1.keys())
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+
+    flatten_candidate = [si for tt in range(5) for si in candidate[tt]]
+    metrics_best_n = calc_diversity(flatten_candidate)
+    text_result = ','.join('{:s}={:.6f}'.format(key, metrics_best_n[key]) for key in metrics_best_n.keys())
+    logging_csv([epoch, updates, text_result])
+    print(text_result, flush=True)
+
+    # save to one file
+    candidate = list(zip(*candidate))
+    utils.write_observe_to_file(source, candidate, log_path, epoch)
+    return bleu
+
 def eval_loss(model, vocab, valid_data, epoch, updates):
     model.eval()
 
@@ -658,6 +709,8 @@ def main():
         model = select2seq_label(config, vocab, use_cuda)
     elif args.model == 'var_select_user2seq_label':
         model = var_select_user2seq_label(config, vocab, use_cuda)
+    elif args.model == 'select2seq_encode':
+        model = select2seq_encode(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")
@@ -717,6 +770,8 @@ def main():
         if args.topic:
             # utils.write_embedding(model.get_user.use_emb.weight.detach().cpu().numpy(), log_path, epoch)
             eval_bleu_with_topic(model, vocab, test_data, epoch, updates)
+        elif args.topic_vec:
+            eval_topic_vec(model, vocab, test_data, epoch, updates)
         else:
             eval_bleu(model, vocab, test_data, epoch, updates)
 
