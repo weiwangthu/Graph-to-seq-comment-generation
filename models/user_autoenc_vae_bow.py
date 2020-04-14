@@ -151,95 +151,21 @@ class user_autoenc_vae_bow(nn.Module):
 
         }
 
-    def sample(self, batch, use_cuda):
+    def generate_with_topic(self, batch, use_cuda):
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, state, comment_rep = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
 
-        bos = torch.ones(contexts.size(0)).long().fill_(self.vocab.word2id('[START]'))
-        bos = bos.to(contexts.device)
-        sample_ids, final_outputs = self.decoder.sample([bos], state, contexts, None, h_user)
+        # get user
+        selected_user, p_user = self.get_user(batch.title, True)
+        h_user = self.get_user.use_emb(selected_user)
 
-        return sample_ids, final_outputs[1]
+        # decoder
+        dec_hidden = torch.log(torch.softmax(- self.dec_linear1(h_user), dim=-1) + 0.0001)
+        dec_hidden[:, 1] = float('-inf')
+        dec_hidden[:, 2] = float('-inf')
 
-    # TODO: fix beam search
-    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
-        # (1) Run the encoder on the src. Done!!!!
-        if use_cuda:
-            batch = move_to_cuda(batch)
-        contexts, enc_state, comment_rep = self.encode(batch, True)
-        h_user, _ = self.get_user(contexts, True)
-
-        batch_size = contexts.size(0)
-        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
-                for _ in range(batch_size)]
-
-        #  (1b) Initialize for the decoder.
-        def rvar(a):
-            return a.repeat(1, beam_size, 1)
-
-        def unbottle(m):
-            return m.view(beam_size, batch_size, -1)
-
-        # Repeat everything beam_size times.
-        # (batch, seq, nh) -> (beam*batch, seq, nh)
-        contexts = contexts.repeat(beam_size, 1, 1)
-        h_user = h_user.repeat(beam_size, 1)
-        # (batch, seq) -> (beam*batch, seq)
-        # src_mask = src_mask.repeat(beam_size, 1)
-        # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
-        # assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
-        dec_state = (rvar(enc_state[0]), rvar(enc_state[1]))  # layer, beam*batch, nh
-        # decState.repeat_beam_size_times(beam_size)
-
-        # (2) run the decoder to generate sentences, using beam search.
-        for i in range(self.config.max_tgt_len):
-
-            if all((b.done() for b in beam)):
-                break
-
-            # Construct beam*batch  nxt words.
-            # Get all the pending current beam words and arrange for forward.
-            # beam is batch_sized, so stack on dimension 1 not 0
-            inp = torch.stack([b.getCurrentState() for b in beam], 1).contiguous().view(-1)
-            if use_cuda:
-                inp = inp.cuda()
-
-            # Run one step.
-            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, None, h_user)
-            # decOut: beam x rnn_size
-
-            # (b) Compute a vector of batch*beam word scores.
-            output = unbottle(self.log_softmax(output))
-            attn = unbottle(attn)
-            # beam x tgt_vocab
-
-            # (c) Advance each beam.
-            # update state
-            for j, b in enumerate(beam):  # there are batch size beams!!! so here enumerate over batch
-                b.advance(output.data[:, j], attn.data[:, j])  # output is beam first
-                b.beam_update(dec_state, j)
-
-        # (3) Package everything up.
-        allHyps, allScores, allAttn = [], [], []
-
-        for j in range(batch_size):
-            b = beam[j]
-            scores, ks = b.sortFinished(minimum=n_best)
-            hyps, attn = [], []
-            for i, (times, k) in enumerate(ks[:n_best]):
-                hyp, att = b.getHyp(times, k)
-                hyps.append(hyp)
-                attn.append(att.max(1)[1])
-            allHyps.append(hyps)
-            allScores.append(scores)
-            allAttn.append(attn)
-
-        # print(allHyps)
-        # print(allAttn)
-        return allHyps, allAttn
-
+        values, inds = dec_hidden.topk(50, -1)
+        return inds
 
 def sample_gumbel(shape, eps=1e-20):
     U = torch.rand(shape)
