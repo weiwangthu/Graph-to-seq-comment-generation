@@ -360,8 +360,12 @@ class DataLoader:
                     break
         else:
             # contain one article and multi comments
-            article['comment'] = article['comment'][:5]
-            comments.append(article)
+            item = dict()
+            item['id'] = article['id']
+            item['title'] = article['title']
+            item['body'] = article['body']
+            item['comment'] = [c[0] for c in article['comment'][:5]]
+            comments.append(item)
         return comments
 
     def create_comments_from_yahoo_article(self, article, article_ext=None):
@@ -386,7 +390,7 @@ class DataLoader:
             item['title'] = article['title']
             item['body'] = ' '.join(article['paras'])
             item['comment'] = [c['cmt'] for c in article['cmts'][:5]]
-            comments.append(article)
+            comments.append(item)
         return comments
 
     def covert_json_to_example(self, json_list):
@@ -396,7 +400,7 @@ class DataLoader:
                 target = g['comment'].split()
             else:
                 # multi comments for each article
-                target = [s[0].split()for s in g['comment']]
+                target = [s.split() for s in g['comment']]
 
             title = g["title"].split()
             original_content = g["body"].split()

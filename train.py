@@ -71,6 +71,8 @@ def parse_args():
                         help='whether to use gcn in the encoder')
     parser.add_argument('-drop_dec_input', default=False, action="store_true",
                         help='whether to use title in the seq2seq')
+    parser.add_argument('-use_label', default=False, action="store_true",
+                        help='whether to use title in the seq2seq')
 
     parser.add_argument('-notrain', default=False, action='store_true',
                         help="train or not")
@@ -628,8 +630,10 @@ def main():
     use_gnn = False
     if args.graph_model == 'GNN':
         use_gnn = True
-    train_data = DataLoader(config.train_file, config, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num, config.train_label_file)
-    valid_data = DataLoader(config.valid_file, config, vocab, args.adj, use_gnn, args.model, True, args.debug, args.train_num, config.dev_label_file)
+    train_data = DataLoader(config.train_file, config, vocab, args.adj, use_gnn, args.model,
+                            True, args.debug, args.train_num, config.train_label_file if args.use_label else None)
+    valid_data = DataLoader(config.valid_file, config, vocab, args.adj, use_gnn, args.model,
+                            True, args.debug, args.train_num, config.dev_label_file if args.use_label else None)
 
     # model
     print('building model...\n')
