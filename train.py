@@ -54,7 +54,8 @@ def parse_args():
                                  'var_select2seq_align', 'var_select2seq_test_span', 'var_select2seq_test_span2',
                                  'var_select_user2seq_new2', 'var_select2seq_test_span3',
                                  'select2seq_label', 'var_select_user2seq_label',
-                                 'select2seq_encode', 'select2seq_encode2'
+                                 'select2seq_encode', 'select2seq_encode2', 'user_autoenc_vae_bow2',
+                                 'var_select_user2seq_new3'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -252,7 +253,7 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
 
                 # get other loss information
                 for k, v in result.items():
-                    if k in ['loss', 'acc'] or v.numel() > 1:
+                    if k in ['loss', 'acc'] or (hasattr(v, 'numel') and v.numel() > 1):
                         continue  # these are already logged above
                     else:
                         extra_meters[k].update(v.item())
@@ -714,6 +715,10 @@ def main():
         model = select2seq_encode(config, vocab, use_cuda)
     elif args.model == 'select2seq_encode2':
         model = select2seq_encode2(config, vocab, use_cuda)
+    elif args.model == 'user_autoenc_vae_bow2':
+        model = user_autoenc_vae_bow2(config, vocab, use_cuda)
+    elif args.model == 'var_select_user2seq_new3':
+        model = var_select_user2seq_new3(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")

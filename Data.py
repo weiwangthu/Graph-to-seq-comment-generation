@@ -128,7 +128,8 @@ class Example:
                 or model == 'user2seq_test_new' or model == 'var_select_user2seq_new' \
                 or model == 'var_select2seq_test_new' or model == 'var_select2seq_test_span' \
                 or model == 'var_select2seq_test_span2' or model == 'var_select_user2seq_new2' \
-                or model == 'var_select2seq_test_span3' or model == 'var_select_user2seq_label':
+                or model == 'var_select2seq_test_span3' or model == 'var_select_user2seq_label' \
+                or model == 'user_autoenc_vae_bow2' or model == 'var_select_user2seq_new3':
             if is_train:
                 content_words = vocab.sent2id(self.ori_target, add_start=True, add_end=True, remove_stop=True)
                 self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
@@ -180,6 +181,11 @@ class Batch:
                 or model == 'autoenc_vae_bow_norm' or model == 'user_autoenc_vae_bow_norm':
             if is_train:
                 self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
+            else:
+                title_list = [e.title for e in example_list]
+                self.title_len = self.get_length(title_list, MAX_TITLE_LENGTH)
+                self.title, self.title_mask = self.padding_list_to_tensor(title_list, self.title_len.max().item())
+
         # seq2seq, select_diverse2seq, select2seq and so on.
         else:
             content_list = [e.original_content for e in example_list]
@@ -197,7 +203,8 @@ class Batch:
             if model == 'user2seq_test_new' or model == 'var_select_user2seq_new' \
                     or model == 'var_select2seq_test_new' or model == 'var_select2seq_test_span' \
                     or model == 'var_select2seq_test_span2' or model == 'var_select_user2seq_new2'\
-                    or model == 'var_select2seq_test_span3' or model == 'var_select_user2seq_label':
+                    or model == 'var_select2seq_test_span3' or model == 'var_select_user2seq_label'\
+                    or model == 'user_autoenc_vae_bow2' or model == 'var_select_user2seq_new3':
                 if is_train:
                     self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
 
