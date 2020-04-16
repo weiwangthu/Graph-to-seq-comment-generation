@@ -37,7 +37,7 @@ class GetUser(nn.Module):
             selected_user = ids
             p_user = None
             h_user = self.use_emb(selected_user)
-            h_user += latent_context
+            # h_user += latent_context
         return selected_user, p_user, h_user
 
 class user_autoenc_vae_bow2(nn.Module):
@@ -174,8 +174,7 @@ class user_autoenc_vae_bow2(nn.Module):
             batch = move_to_cuda(batch)
 
         # get user
-        selected_user, p_user = self.get_user(batch.title, True)
-        h_user = self.get_user.use_emb(selected_user)
+        selected_user, p_user, h_user = self.get_user(batch.title, True)
 
         # decoder
         dec_hidden = torch.log(torch.softmax(- self.dec_linear1(h_user), dim=-1) + 0.0001)
@@ -184,6 +183,90 @@ class user_autoenc_vae_bow2(nn.Module):
 
         values, inds = dec_hidden.topk(50, -1)
         return inds
+
+    # TODO: fix beam search
+    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
+        # (1) Run the encoder on the src. Done!!!!
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        z, kld = self.encode(batch, True)
+
+        # get user
+        selected_user, p_user, h_user = self.get_user(z, True)
+
+        # decoder
+        z = torch.tanh(self.z_to_hidden(torch.cat([z+h_user, h_user], dim=-1)))
+        zz = z.unsqueeze(0).repeat(self.config.num_layers, 1, 1)
+        dec_state = (zz, zz)
+
+        batch_size = h_user.size(0)
+        beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
+                for _ in range(batch_size)]
+
+        #  (1b) Initialize for the decoder.
+        def rvar(a):
+            return a.repeat(1, beam_size, 1)
+
+        def unbottle(m):
+            return m.view(beam_size, batch_size, -1)
+
+        # Repeat everything beam_size times.
+        # (batch, seq, nh) -> (beam*batch, seq, nh)
+        # (batch, seq) -> (beam*batch, seq)
+        # src_mask = src_mask.repeat(beam_size, 1)
+        # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
+        # assert contexts.size(1) == src_mask.size(1), (contexts.size(), src_mask.size())
+        dec_state = (rvar(dec_state[0]), rvar(dec_state[1]))  # layer, beam*batch, nh
+        # decState.repeat_beam_size_times(beam_size)
+
+        # (2) run the decoder to generate sentences, using beam search.
+        for i in range(self.config.max_tgt_len):
+
+            if all((b.done() for b in beam)):
+                break
+
+            # Construct beam*batch  nxt words.
+            # Get all the pending current beam words and arrange for forward.
+            # beam is batch_sized, so stack on dimension 1 not 0
+            inp = torch.stack([b.getCurrentState() for b in beam], 1).contiguous().view(-1)
+            if use_cuda:
+                inp = inp.cuda()
+
+            # Run one step.
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, None, None, None)
+            # decOut: beam x rnn_size
+
+            # (b) Compute a vector of batch*beam word scores.
+            output = unbottle(self.log_softmax(output))
+            if attn is None:
+                attn = output
+            attn = unbottle(attn)
+            # beam x tgt_vocab
+
+            # (c) Advance each beam.
+            # update state
+            for j, b in enumerate(beam):  # there are batch size beams!!! so here enumerate over batch
+                b.advance(output.data[:, j], attn.data[:, j])  # output is beam first
+                b.beam_update(dec_state, j)
+
+        # (3) Package everything up.
+        allHyps, allScores, allAttn = [], [], []
+
+        for j in range(batch_size):
+            b = beam[j]
+            scores, ks = b.sortFinished(minimum=n_best)
+            hyps, attn = [], []
+            for i, (times, k) in enumerate(ks[:n_best]):
+                hyp, att = b.getHyp(times, k)
+                hyps.append(hyp)
+                attn.append(att.max(1)[1])
+            allHyps.append(hyps)
+            allScores.append(scores)
+            allAttn.append(attn)
+
+        # print(allHyps)
+        # print(allAttn)
+        return allHyps, allAttn
 
 def sample_gumbel(shape, eps=1e-20):
     U = torch.rand(shape)
