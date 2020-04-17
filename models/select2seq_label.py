@@ -136,11 +136,11 @@ class select2seq_label(nn.Module):
         return sample_ids, final_outputs[1]
 
     # TODO: fix beam search
-    def beam_sample(self, batch, use_cuda, beam_size=1):
+    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, context_gates = self.encode(batch, True)
+        contexts, enc_state, org_context_gates, _ = self.encode(batch, True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)
@@ -156,7 +156,7 @@ class select2seq_label(nn.Module):
         # Repeat everything beam_size times.
         # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
-        context_gates = context_gates.repeat(beam_size, 1)
+        context_gates = org_context_gates.repeat(beam_size, 1)
         # (batch, seq) -> (beam*batch, seq)
         # src_mask = src_mask.repeat(beam_size, 1)
         # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
@@ -197,20 +197,25 @@ class select2seq_label(nn.Module):
 
         for j in range(batch_size):
             b = beam[j]
-            n_best = 1
             scores, ks = b.sortFinished(minimum=n_best)
             hyps, attn = [], []
             for i, (times, k) in enumerate(ks[:n_best]):
                 hyp, att = b.getHyp(times, k)
                 hyps.append(hyp)
                 attn.append(att.max(1)[1])
-            allHyps.append(hyps[0])
-            allScores.append(scores[0])
-            allAttn.append(attn[0])
+            allHyps.append(hyps)
+            allScores.append(scores)
+            allAttn.append(attn)
 
         # print(allHyps)
         # print(allAttn)
-        return allHyps, allAttn
+        if self.config.debug_select:
+            title_content = batch.title_content
+            title_content[org_context_gates < 0.1] = self.vocab.PAD_token
+            all_select_words = title_content
+            return allHyps, allAttn, all_select_words
+        else:
+            return allHyps, allAttn
 
 
 def sample_gumbel(shape, eps=1e-20):
