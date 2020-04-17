@@ -47,3 +47,4 @@ from models.select2seq_encode import select2seq_encode
 from models.select2seq_encode2 import select2seq_encode2
 from models.user_autoenc_vae_bow2 import user_autoenc_vae_bow2
 from models.var_select_user2seq_new3 import var_select_user2seq_new3
+from models.user_autoenc_vae_bow3 import user_autoenc_vae_bow3

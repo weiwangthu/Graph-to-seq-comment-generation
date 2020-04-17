@@ -129,7 +129,8 @@ class Example:
                 or model == 'var_select2seq_test_new' or model == 'var_select2seq_test_span' \
                 or model == 'var_select2seq_test_span2' or model == 'var_select_user2seq_new2' \
                 or model == 'var_select2seq_test_span3' or model == 'var_select_user2seq_label' \
-                or model == 'user_autoenc_vae_bow2' or model == 'var_select_user2seq_new3':
+                or model == 'user_autoenc_vae_bow2' or model == 'var_select_user2seq_new3' \
+                or model == 'user_autoenc_vae_bow3':
             if is_train:
                 content_words = vocab.sent2id(self.ori_target, add_start=True, add_end=True, remove_stop=True)
                 self.tgt_bow = np.bincount(content_words, minlength=vocab.voc_size)
@@ -204,7 +205,8 @@ class Batch:
                     or model == 'var_select2seq_test_new' or model == 'var_select2seq_test_span' \
                     or model == 'var_select2seq_test_span2' or model == 'var_select_user2seq_new2'\
                     or model == 'var_select2seq_test_span3' or model == 'var_select_user2seq_label'\
-                    or model == 'user_autoenc_vae_bow2' or model == 'var_select_user2seq_new3':
+                    or model == 'user_autoenc_vae_bow2' or model == 'var_select_user2seq_new3' \
+                    or model == 'user_autoenc_vae_bow3':
                 if is_train:
                     self.tgt_bow = torch.FloatTensor([e.tgt_bow for e in example_list])
 
