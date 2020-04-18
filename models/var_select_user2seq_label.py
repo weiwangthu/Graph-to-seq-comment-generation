@@ -416,11 +416,11 @@ class var_select_user2seq_label(nn.Module):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
-        contexts, enc_state, z, kld, post_context_gates, comment_rep, kld_select, org_context_gates = self.encode(batch, True)
+        contexts, enc_state, z, kld, org_context_gates, comment_rep, kld_select, _, _ = self.encode(batch, True)
         content_len, content_mask = batch.title_content_len, batch.title_content_mask
 
         # get user
-        gate_mask_temp = post_context_gates * content_mask.float()
+        gate_mask_temp = org_context_gates * content_mask.float()
         gate_len = gate_mask_temp.sum(dim=-1) + 0.00001
         init_state = (contexts * gate_mask_temp.unsqueeze(dim=2)).sum(dim=1) / gate_len.unsqueeze(dim=1)
         content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(init_state, True)
@@ -495,7 +495,7 @@ class var_select_user2seq_label(nn.Module):
         # print(allAttn)
         if self.config.debug_select:
             title_content = batch.title_content
-            title_content[org_context_gates > 0.9] = self.vocab.PAD_token
+            title_content[org_context_gates < 0.1] = self.vocab.PAD_token
             all_select_words = title_content
             return allHyps, allAttn, all_select_words
         else:
