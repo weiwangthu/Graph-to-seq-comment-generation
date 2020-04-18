@@ -466,7 +466,7 @@ class var_select_user2seq_new2(nn.Module):
         # print(allAttn)
         if self.config.debug_select:
             title_content = batch.title_content
-            title_content[org_context_gates > 0.9] = self.vocab.PAD_token
+            title_content[org_context_gates < 0.1] = self.vocab.PAD_token
             all_select_words = title_content
             return allHyps, allAttn, all_select_words
         else:
