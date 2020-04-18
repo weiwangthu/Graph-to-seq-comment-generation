@@ -209,7 +209,7 @@ class user2seq_test_new(nn.Module):
         # get user
         h_user, selected_user, p_user = self.get_user(z)
         content_h_user, content_selected_user, content_p_user = self.get_user.content_to_user(state[0][-1])
-        if self.config.use_post:
+        if self.config.use_post_user:
             user = h_user
         else:
             user = content_h_user
