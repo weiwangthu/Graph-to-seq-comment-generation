@@ -110,7 +110,7 @@ class select2seq_encode2(nn.Module):
         return sample_ids, final_outputs[1]
 
     # TODO: fix beam search
-    def beam_sample(self, batch, use_cuda, beam_size=1):
+    def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
         # (1) Run the encoder on the src. Done!!!!
         if use_cuda:
             batch = move_to_cuda(batch)
@@ -130,7 +130,6 @@ class select2seq_encode2(nn.Module):
         # Repeat everything beam_size times.
         # (batch, seq, nh) -> (beam*batch, seq, nh)
         contexts = contexts.repeat(beam_size, 1, 1)
-        context_gates = context_gates.repeat(beam_size, 1)
         # (batch, seq) -> (beam*batch, seq)
         # src_mask = src_mask.repeat(beam_size, 1)
         # assert contexts.size(0) == src_mask.size(0), (contexts.size(), src_mask.size())
@@ -152,7 +151,7 @@ class select2seq_encode2(nn.Module):
                 inp = inp.cuda()
 
             # Run one step.
-            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, context_gates)
+            output, dec_state, attn = self.decoder.sample_one(inp, dec_state, contexts, None)
             # decOut: beam x rnn_size
 
             # (b) Compute a vector of batch*beam word scores.
@@ -171,16 +170,15 @@ class select2seq_encode2(nn.Module):
 
         for j in range(batch_size):
             b = beam[j]
-            n_best = 1
             scores, ks = b.sortFinished(minimum=n_best)
             hyps, attn = [], []
             for i, (times, k) in enumerate(ks[:n_best]):
                 hyp, att = b.getHyp(times, k)
                 hyps.append(hyp)
                 attn.append(att.max(1)[1])
-            allHyps.append(hyps[0])
-            allScores.append(scores[0])
-            allAttn.append(attn[0])
+            allHyps.append(hyps)
+            allScores.append(scores)
+            allAttn.append(attn)
 
         # print(allHyps)
         # print(allAttn)
