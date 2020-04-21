@@ -52,6 +52,9 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 2 -config config_yahoo.yaml \
 # h_attention
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 3 -config config_yahoo.yaml \
   -model h_attention -log h_attention
+# gann
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_yahoo.yaml \
+  -model seq2gateseq -log seq2gateseq_t
 
 #tencent
 # seq2seq-T
@@ -68,3 +71,6 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 2 -config config_tencent.yaml \
 # h_attention
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 3 -config config_tencent.yaml \
   -model h_attention -log h_attention
+# gann
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_tencent.yaml \
+  -model seq2gateseq -log seq2gateseq_t

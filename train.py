@@ -39,8 +39,8 @@ def parse_args():
     parser.add_argument('-config', default='config.yaml', type=str,
                         help="config file")
     parser.add_argument('-model', default='graph2seq', type=str,
-                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'select_diverse2seq',
-                                 'select2seq', 'select_var_diverse2seq',
+                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'seq2gateseq',
+                                 'select_diverse2seq', 'select2seq', 'select_var_diverse2seq',
                                  'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq',
                                  'select2seq_test', 'var_select_var_user_diverse2seq_test',
                                  'var_select_var_user_diverse2seq_test2', 'var_select_var_user_diverse2seq_test3',
@@ -55,7 +55,7 @@ def parse_args():
                                  'var_select_user2seq_new2', 'var_select2seq_test_span3',
                                  'select2seq_label', 'var_select_user2seq_label',
                                  'select2seq_encode', 'select2seq_encode2', 'user_autoenc_vae_bow2',
-                                 'var_select_user2seq_new3', 'user_autoenc_vae_bow3'
+                                 'var_select_user2seq_new3', 'user_autoenc_vae_bow3',
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -91,6 +91,8 @@ def parse_args():
     parser.add_argument('-debug_select', default=False, action="store_true",
                         help='save a checkpoint every N epochs')
     parser.add_argument('-topic', default=False, action="store_true",
+                        help='save a checkpoint every N epochs')
+    parser.add_argument('-topic_content', default=False, action="store_true",
                         help='save a checkpoint every N epochs')
     parser.add_argument('-no_topk', default=False, action="store_true",
                         help='save a checkpoint every N epochs')
@@ -361,8 +363,11 @@ def eval_topic(model, train_data, epoch):
             raise Exception('nan error')
 
         # debug, for saving selected_user of each comment
-        selected_user = result['selected_user'].tolist()
-        # selected_user = result['con_sel_user'].tolist()
+        if args.topic_content:
+            selected_user = result['con_sel_user'].tolist()
+        else:
+            selected_user = result['selected_user'].tolist()
+
         for bid in range(len(selected_user)):
             collect_result[selected_user[bid]].append(batch.examples[bid].ori_target)
         if sum([len(uu) for uu in collect_result]) > min(config.n_topic_num * 1000, 200000):
@@ -647,6 +652,8 @@ def main():
         model = bow2seq(config, vocab, use_cuda)
     elif args.model == 'h_attention':
         model = hierarchical_attention(config, vocab, use_cuda)
+    elif args.model == 'seq2gateseq':
+        model = seq2gateseq(config, vocab, use_cuda)
     elif args.model == 'select_diverse2seq':
         model = select_diverse2seq(config, vocab, use_cuda)
     elif args.model == 'select2seq':
