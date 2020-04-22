@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument('-config', default='config.yaml', type=str,
                         help="config file")
     parser.add_argument('-model', default='graph2seq', type=str,
-                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'seq2gateseq',
+                        choices=['seq2seq', 'graph2seq', 'bow2seq', 'h_attention', 'seq2gateseq', 'cvae',
                                  'select_diverse2seq', 'select2seq', 'select_var_diverse2seq',
                                  'var_select_var_diverse2seq', 'var_select_var_user_diverse2seq',
                                  'select2seq_test', 'var_select_var_user_diverse2seq_test',
@@ -654,6 +654,8 @@ def main():
         model = hierarchical_attention(config, vocab, use_cuda)
     elif args.model == 'seq2gateseq':
         model = seq2gateseq(config, vocab, use_cuda)
+    elif args.model == 'cvae':
+        model = cvae(config, vocab, use_cuda)
     elif args.model == 'select_diverse2seq':
         model = select_diverse2seq(config, vocab, use_cuda)
     elif args.model == 'select2seq':
