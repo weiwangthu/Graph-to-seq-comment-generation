@@ -120,7 +120,7 @@ class rnn_decoder(nn.Module):
         else:
             activation = None
 
-        self.attention = models.global_attention(config.decoder_hidden_size, activation)
+        self.attention = models.global_attention(config.decoder_hidden_size, activation, config.fix_gate)
         # self.attention = models.global_attention(config.decoder_hidden_size, activation)
         self.hidden_size = config.decoder_hidden_size
         self.dropout = nn.Dropout(config.dropout)

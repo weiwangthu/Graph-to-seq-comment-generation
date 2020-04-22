@@ -24,13 +24,14 @@ class memory_attention(nn.Module):
 
 class global_attention(nn.Module):
 
-    def __init__(self, hidden_size, activation=None):
+    def __init__(self, hidden_size, activation=None, fix_gate=False):
         super(global_attention, self).__init__()
         self.linear_in = nn.Linear(hidden_size, hidden_size)
         self.linear_out = nn.Linear(2 * hidden_size, hidden_size)
         self.softmax = nn.Softmax(-1)
         self.tanh = nn.Tanh()
         self.activation = activation
+        self.fix_gate = fix_gate
 
     def forward(self, x, context, mask=None, context_gates=None):
         gamma_h = self.linear_in(x).unsqueeze(2)  # batch * size * 1
@@ -39,9 +40,24 @@ class global_attention(nn.Module):
         weights = torch.bmm(context, gamma_h).squeeze(2)  # batch * time
 
         if context_gates is not None:
-            weights = weights * context_gates
+            if self.fix_gate:
+                weights = self.softmax(weights)
+                weights = weights * context_gates
+                weights = self.softmax(weights)
+                # weights_temp = torch.exp(weights)
+                # weights_temp2 = weights_temp * context_gates
+                # if torch.isnan(weights_temp2).any():
+                #     raise Exception('1nan error')
+                # weights_sum = weights_temp2.sum(dim=-1, keepdim=True) + 0.00001
+                # weights = weights_temp2 / weights_sum
+                # if torch.isnan(weights).any():
+                #     raise Exception('2nan error')
+            else:
+                weights = weights * context_gates
+                weights = self.softmax(weights)
+        else:
+            weights = self.softmax(weights)  # batch * time
 
-        weights = self.softmax(weights)  # batch * time
         c_t = torch.bmm(weights.unsqueeze(1), context).squeeze(1)  # batch * size
         output = self.tanh(self.linear_out(torch.cat([c_t, x], 1)))
         return output, weights
