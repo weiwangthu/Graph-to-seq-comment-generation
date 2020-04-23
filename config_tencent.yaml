@@ -52,6 +52,7 @@ gate_prob: 0.5
 use_post_gate: False
 content_span: 20
 debug_select: False
+fix_gate: False
 
 # optimize
 epoch: 40
