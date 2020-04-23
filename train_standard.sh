@@ -56,6 +56,22 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 3 -config config_yahoo.yaml \
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_yahoo.yaml \
   -model seq2gateseq -log seq2gateseq_t
 
+# 163
+# seq2seq-T
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -config config_163.yaml \
+  -model seq2seq -log seq2seq_t
+# seq2seq-TC
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -config config_163.yaml \
+  -model seq2seq -use_content -log seq2seq_tc
+# bow2seq-b
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 2 -config config_163.yaml \
+  -model bow2seq -log bow2seq_b
+## bow2seq-k
+#CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -model bow2seq -log bow2seq_k
+# gann
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_163.yaml \
+  -model seq2gateseq -log seq2gateseq_t
+
 #tencent
 # seq2seq-T
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -config config_tencent.yaml \
