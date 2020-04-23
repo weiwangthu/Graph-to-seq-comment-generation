@@ -115,7 +115,9 @@ class cvae(nn.Module):
     # TODO: fix beam search
     def beam_sample(self, batch, use_cuda, beam_size=1, n_best=1):
         # (1) Run the encoder on the src. Done!!!!
-        contexts, enc_state = self.encode(batch, use_cuda)
+        if use_cuda:
+            batch = move_to_cuda(batch)
+        contexts, enc_state, _ = self.encode(batch, True)
 
         batch_size = contexts.size(0)
         beam = [models.Beam(beam_size, n_best=1, cuda=use_cuda)

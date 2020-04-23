@@ -55,6 +55,10 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 3 -config config_yahoo.yaml \
 # gann
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_yahoo.yaml \
   -model seq2gateseq -log seq2gateseq_t
+# cvae
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 0 -config config_yahoo.yaml \
+  -model cvae -log cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
 
 # 163
 # seq2seq-T
@@ -71,6 +75,10 @@ CUDA_VISIBLE_DEVICES=2 python train.py -gpus 2 -config config_163.yaml \
 # gann
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_163.yaml \
   -model seq2gateseq -log seq2gateseq_t
+# cvae
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 0 -config config_163.yaml \
+  -model cvae -log cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
 
 #tencent
 # seq2seq-T
@@ -90,3 +98,7 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 3 -config config_tencent.yaml \
 # gann
 CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_tencent.yaml \
   -model seq2gateseq -log seq2gateseq_t
+# cvae
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_tencent.yaml \
+  -model cvae -log cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
