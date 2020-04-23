@@ -51,6 +51,26 @@ def build_yahoo_vocab(corpus_files, vocab_file):
     write.close()
 
 
+def build_163_vocab(corpus_files, vocab_file):
+    word2count = {}
+    for corpus_file in corpus_files:
+        for line in open(corpus_file):
+            # words = line.strip().split()
+            g = json.loads(line)
+            words = g["body"].split()
+            words.extend(g["title"].split())
+            words.extend([w for com in g["cmts"] for w in com['cmt'].split()])
+            for word in words:
+                if word not in word2count:
+                    word2count[word] = 0
+                word2count[word] += 1
+    word2count = list(word2count.items())
+    word2count.sort(key=lambda k: k[1], reverse=True)
+    write = open(vocab_file, 'w')
+    for word_pair in word2count:
+        write.write(word_pair[0] + '\t' + str(word_pair[1]) + '\n')
+    write.close()
+
 if __name__ == "__main__":
     args = parse_config()
     config = util.utils.read_config(args.config)
@@ -63,4 +83,5 @@ if __name__ == "__main__":
 
     corpus_files = [config.train_file, config.valid_file, config.test_file]
     vocab_file = config.vocab_file
-    build_yahoo_vocab(corpus_files, vocab_file)
+    # build_yahoo_vocab(corpus_files, vocab_file)
+    build_163_vocab(corpus_files, vocab_file)
