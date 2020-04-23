@@ -43,15 +43,12 @@ class global_attention(nn.Module):
             if self.fix_gate:
                 weights = self.softmax(weights)
                 weights = weights * context_gates
-                weights = self.softmax(weights)
+                # weights = self.softmax(weights)
+
                 # weights_temp = torch.exp(weights)
                 # weights_temp2 = weights_temp * context_gates
-                # if torch.isnan(weights_temp2).any():
-                #     raise Exception('1nan error')
-                # weights_sum = weights_temp2.sum(dim=-1, keepdim=True) + 0.00001
-                # weights = weights_temp2 / weights_sum
-                # if torch.isnan(weights).any():
-                #     raise Exception('2nan error')
+                weights_sum = weights.sum(dim=-1, keepdim=True) + 0.00001
+                weights = weights / weights_sum
             else:
                 weights = weights * context_gates
                 weights = self.softmax(weights)
