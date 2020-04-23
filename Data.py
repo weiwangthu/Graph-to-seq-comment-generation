@@ -276,6 +276,8 @@ class DataLoader:
 
         if self.config.dataset_name == 'yahoo':
             self.create_comments_from_article = lambda x,y: self.create_comments_from_yahoo_article(x, y)
+        elif self.config.dataset_name == '163':
+            self.create_comments_from_article = lambda x, y: self.create_comments_from_163_article(x, y)
         else:
             self.create_comments_from_article = lambda x,y: self.create_comments_from_tencent_article(x, y)
 
@@ -391,6 +393,31 @@ class DataLoader:
             item['id'] = article['_id']
             item['title'] = article['title']
             item['body'] = ' '.join(article['paras'])
+            item['comment'] = [c['cmt'] for c in article['cmts'][:5]]
+            comments.append(item)
+        return comments
+
+    def create_comments_from_163_article(self, article, article_ext=None):
+        comments = []
+        if self.is_train:
+            for i in range(len(article['cmts'])):
+                item = dict()
+                item['title'] = article['title']
+                item['body'] = article['body']
+                item['comment'] = article['cmts'][i]['cmt']
+                comments.append(item)
+
+                if article_ext is not None:
+                    item['content_label'] = article_ext['com_labels'][i]
+
+                if 0 < self.config.max_comment_num <= len(comments):
+                    break
+        else:
+            # contain one article and multi comments
+            item = dict()
+            item['id'] = article['_id']
+            item['title'] = article['title']
+            item['body'] = article['body']
             item['comment'] = [c['cmt'] for c in article['cmts'][:5]]
             comments.append(item)
         return comments

@@ -1,5 +1,5 @@
 # data
-dataset_name: 'yahoo'
+dataset_name: '163'
 train_file: './ft_local/163/train.json'
 valid_file: './ft_local/163/dev.json'
 test_file: './ft_local/163/test.json'
@@ -52,6 +52,7 @@ gate_prob: 0.5
 use_post_gate: False
 content_span: 20
 debug_select: False
+fix_gate: False
 
 # optimize
 epoch: 40
