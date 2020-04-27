@@ -65,8 +65,8 @@ CUDA_VISIBLE_DEVICES=1 python train.py -gpus 0 -config config_yahoo.yaml \
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -config config_163.yaml \
   -model seq2seq -log seq2seq_t
 # seq2seq-TC
-CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -config config_163.yaml \
-  -model seq2seq -use_content -log seq2seq_tc
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 1 -config config_163.yaml \
+  -model seq2seq -use_content -log seq2seq_tc -restore checkpoint_last.pt
 # bow2seq-b
 CUDA_VISIBLE_DEVICES=2 python train.py -gpus 2 -config config_163.yaml \
   -model bow2seq -log bow2seq_b
