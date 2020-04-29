@@ -58,6 +58,7 @@ gama_label: 0.0
 no_topk: False
 topk_num: 5
 fix_gate: False
+debug_select_topic: False
 
 # optimize
 epoch: 40

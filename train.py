@@ -100,6 +100,10 @@ def parse_args():
                         help='save a checkpoint every N epochs')
     parser.add_argument('-topic_vec', default=False, action="store_true",
                         help='save a checkpoint every N epochs')
+    parser.add_argument('-debug_select_topic', default=False, action="store_true",
+                        help='save a checkpoint every N epochs')
+    parser.add_argument('-collect_num', type=int, default=20, metavar='N',
+                        help='save a checkpoint every N epochs')
 
     parser.add_argument('-log', default='', type=str,
                         help="log directory")
@@ -392,7 +396,7 @@ def eval_topic(model, train_data, epoch):
         f.write('\n'.join(result_str))
         f.write('\n')
 
-    collect_num = 20
+    collect_num = args.collect_num
     for uid in collect_ids[:collect_num]:
         topic_comments = list(map(lambda x: ''.join(x), collect_result[uid]))
         with codecs.open(log_path + 'topic_comment.%s.%s' % (str(epoch), str(uid)), 'w', 'utf-8') as f:
@@ -464,6 +468,7 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
 
     candidate = [[] for _ in range(args.n_topic)]
     select_content = [[] for _ in range(args.n_topic)]
+    select_topic_content = [[] for _ in range(args.n_topic)]
     for i in range(args.n_topic):
         print('decode topic %d' % i)
         for batch in tqdm(valid_data, disable=not args.verbose):
@@ -474,7 +479,9 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
                 result = model.beam_sample(batch, use_cuda, beam_size=config.beam_size)
                 samples, alignment = result[0], result[1]
                 if config.debug_select:
-                    select_words = result[2]
+                    select_words = result[2]['select_words']
+                if config.debug_select_topic:
+                    select_topics = result[2]['select_topics']
             '''
             if i == 0:
                 print(batch.examples[27].ori_title)
@@ -493,11 +500,15 @@ def eval_bleu_with_topic(model, vocab, valid_data, epoch, updates):
 
             if config.debug_select:
                 select_content[i] += [vocab.id2sent(s) for s in select_words]
+            if config.debug_select_topic:
+                select_topic_content[i] += [str(s.item()) for s in select_topics]
         # save to file
         utils.write_topic_result_to_file(source, candidate[i], log_path, epoch, i)
 
         if config.debug_select:
             utils.write_topic_result_to_file(source, select_content[i], log_path, epoch, i, data_type='topic.swords')
+        if config.debug_select_topic:
+            utils.write_topic_result_to_file(source, select_topic_content[i], log_path, epoch, i, data_type='topic.stopics')
 
     # bleu, best 1
     text_result, bleu = utils.eval_multi_bleu(multi_ref, candidate[0], log_path)
