@@ -77,7 +77,8 @@ class GetUser(nn.Module):
                 h_user = self.use_emb(org_ids)
                 selected_user = org_ids
             else:
-                h_user = self.use_emb(ids.squeeze(dim=1))
+                ids = ids.squeeze(dim=1)
+                h_user = self.use_emb(ids)
                 selected_user = ids
         return h_user, selected_user, p_user
 
@@ -462,13 +463,16 @@ class var_select_user2seq_new2(nn.Module):
             allScores.append(scores)
             allAttn.append(attn)
 
-        # print(allHyps)
-        # print(allAttn)
+        extra_data = {}
+        if self.config.debug_select_topic:
+            extra_data['select_topics'] = content_selected_user
         if self.config.debug_select:
             title_content = batch.title_content
             title_content[org_context_gates < 0.1] = self.vocab.PAD_token
-            all_select_words = title_content
-            return allHyps, allAttn, all_select_words
+            extra_data['select_words'] = title_content
+
+        if len(extra_data.items()) > 0:
+            return allHyps, allAttn, extra_data
         else:
             return allHyps, allAttn
 
