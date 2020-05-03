@@ -56,6 +56,7 @@ def parse_args():
                                  'select2seq_label', 'var_select_user2seq_label',
                                  'select2seq_encode', 'select2seq_encode2', 'user_autoenc_vae_bow2',
                                  'var_select_user2seq_new3', 'user_autoenc_vae_bow3',
+                                 'user2seq_test_new2', 'user2seq_test_new22', 'var_select_user2seq_new22'
                                  ])
     parser.add_argument('-adj', type=str, default="numsent",
                         help='adjacent matrix')
@@ -169,6 +170,10 @@ def parse_args():
                        help='save a checkpoint every N epochs')
     group.add_argument('-fix_gate', default=False, action="store_true",
                        help='save a checkpoint every N epochs')
+    group.add_argument('-dynamic5', default=False, action="store_true",
+                       help='save a checkpoint every N epochs')
+    group.add_argument('-gama_kld_cvae', type=float, default=0.0, metavar='N',
+                       help='save a checkpoint every N epochs')
 
 
     opt = parser.parse_args()
@@ -249,6 +254,8 @@ def train(model, vocab, train_data, valid_data, scheduler, optim, org_epoch, upd
                 model.gama_con_select = max(config.gama_con_select, 1 - updates/(15000.0 * args.mid_max))
             if args.dynamic_tau:
                 model.config.tau = tau[epoch]
+            if args.dynamic5:
+                model.gama_kld_cvae = config.gama_kld_cvae * min(1.0, updates/(15000.0 * args.mid_max))
 
             # with autograd.detect_anomaly():
             model.zero_grad()
@@ -747,6 +754,12 @@ def main():
         model = var_select_user2seq_new3(config, vocab, use_cuda)
     elif args.model == 'user_autoenc_vae_bow3':
         model = user_autoenc_vae_bow3(config, vocab, use_cuda)
+    elif args.model == 'user2seq_test_new2':
+        model = user2seq_test_new2(config, vocab, use_cuda)
+    elif args.model == 'user2seq_test_new22':
+        model = user2seq_test_new22(config, vocab, use_cuda)
+    elif args.model == 'var_select_user2seq_new22':
+        model = var_select_user2seq_new22(config, vocab, use_cuda)
 
     # total number of parameters
     logging(repr(model) + "\n\n")

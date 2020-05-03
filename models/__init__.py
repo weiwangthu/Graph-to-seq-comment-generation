@@ -50,3 +50,6 @@ from models.var_select_user2seq_new3 import var_select_user2seq_new3
 from models.user_autoenc_vae_bow3 import user_autoenc_vae_bow3
 from models.seq2gateseq import seq2gateseq
 from models.cvae import cvae
+from models.user2seq_test_new2 import user2seq_test_new2
+from models.user2seq_test_new22 import user2seq_test_new22
+from models.var_select_user2seq_new22 import var_select_user2seq_new22

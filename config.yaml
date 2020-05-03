@@ -59,6 +59,7 @@ no_topk: False
 topk_num: 5
 fix_gate: False
 debug_select_topic: False
+gama_kld_cvae: 0.0
 
 # optimize
 epoch: 40
