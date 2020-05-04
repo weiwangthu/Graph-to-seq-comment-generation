@@ -9,6 +9,11 @@ CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -model seq2seq -log seq2seq_t -no
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -model seq2seq -use_content -log seq2seq_tc -notrain -restore checkpoint_best_25_4.467218.pt -beam_search
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 0 -model bow2seq -log bow2seq_b -notrain -restore checkpoint_best_21_4.419056.pt -beam_search
 
+# cvae
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -notrain -beam_search -restore checkpoint_best.pt \
+  -model cvae -log 5c_cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
+
 
 #yahoo
 # seq2seq-T
@@ -29,6 +34,40 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 2 -config config_yahoo.yaml \
 CUDA_VISIBLE_DEVICES=0 python train.py -gpus 3 -config config_yahoo.yaml \
   -notrain -beam_search -restore checkpoint_best.pt \
   -model h_attention -log h_attention
+# gann
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -config config_yahoo.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model seq2gateseq -log seq2gateseq_t
+# cvae
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 0 -config config_yahoo.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model cvae -log cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
+
+# 163
+# seq2seq-T
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -config config_163.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model seq2seq -log seq2seq_t
+# seq2seq-TC
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 1 -config config_163.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model seq2seq -use_content -log seq2seq_tc
+# bow2seq-b
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 2 -config config_163.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model bow2seq -log bow2seq_b
+## bow2seq-k
+#CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -model bow2seq -log bow2seq_k
+# gann
+CUDA_VISIBLE_DEVICES=0 python train.py -gpus 0 -config config_163.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model seq2gateseq -log seq2gateseq_t
+# cvae
+CUDA_VISIBLE_DEVICES=1 python train.py -gpus 0 -config config_163.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model cvae -log cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
 
 #tencent
 # seq2seq-T
@@ -49,3 +88,12 @@ CUDA_VISIBLE_DEVICES=3 python train.py -gpus 2 -config config_tencent.yaml \
 CUDA_VISIBLE_DEVICES=1 python train.py -gpus 3 -config config_tencent.yaml \
   -notrain -beam_search -restore checkpoint_best.pt \
   -model h_attention -log h_attention
+# gann
+CUDA_VISIBLE_DEVICES=2 python train.py -gpus 0 -config config_tencent.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model seq2gateseq -log seq2gateseq_t
+# cvae
+CUDA_VISIBLE_DEVICES=3 python train.py -gpus 0 -config config_tencent.yaml \
+  -notrain -beam_search -restore checkpoint_best.pt \
+  -model cvae -log cvae \
+  -dynamic2 -mid_max 10 -gama_kld 1
